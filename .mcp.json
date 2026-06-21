@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "bobe": {
+      "command": "node",
+      "args": ["mcp/index.js"],
+      "env": {
+        "DB_HOST": "${DB_HOST:-localhost}",
+        "DB_PORT": "${DB_PORT:-5432}",
+        "DB_DATABASE": "${DB_DATABASE:-bobe_agent}",
+        "DB_USERNAME": "${DB_USERNAME:-}",
+        "DB_PASSWORD": "${DB_PASSWORD:-}",
+        "APP_ENV": "${APP_ENV:-local}",
+        "WALLET_ADDRESS": "${WALLET_ADDRESS}",
+        "BSC_RPC_URL": "${BSC_RPC_URL}",
+        "TATUM_API_KEY": "${TATUM_API_KEY}",
+        "BSC_RPC_RETRIES": "${BSC_RPC_RETRIES:-5}",
+        "BSC_RPC_RETRY_DELAY_MS": "${BSC_RPC_RETRY_DELAY_MS:-5000}",
+        "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN}",
+        "TELEGRAM_CHAT_ID": "${TELEGRAM_CHAT_ID}"
+      }
+    },
+    "cmc": {
+      "type": "http",
+      "url": "https://mcp.coinmarketcap.com/mcp",
+      "headers": { "X-CMC-MCP-API-KEY": "${CMC_API_KEY}" }
+    },
+    "twak": {
+      "command": "twak",
+      "args": ["serve"]
+    }
+  }
+}

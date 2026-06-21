@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* Brand font — Geist (self-hosted, with Cyrillic support). Imported in main.tsx. */
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}

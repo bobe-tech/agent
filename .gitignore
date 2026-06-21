@@ -1,0 +1,15 @@
+node_modules/
+.env
+*.log
+logs/
+.claude/
+.superpowers/
+analysis/
+docs/
+front/dist/
+test-results/
+playwright-report/
+
+# Vite dev cache
+front/.vite/
+backups/

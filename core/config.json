@@ -1,0 +1,29 @@
+{
+  "quote_token": { "symbol": "USDT", "address": "0x55d398326f99059fF775485246999027B3197955", "decimals": 18 },
+  "pairs": {
+    "BTCB/USDT": {
+      "base": "BTCB", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0x46cf1cf8c69595804ba91dfdd8d6b960c9b0a7c4",
+      "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
+    },
+    "ETH/USDT": {
+      "base": "ETH", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0xbe141893e4c6ad9272e8c04bab7e6a10604501a5",
+      "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
+    },
+    "WBNB/USDT": {
+      "base": "WBNB", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0x172fcd41e0913e95784454622d1c3724f546f849",
+      "token": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.01%"
+    },
+    "CAKE/USDT": {
+      "base": "CAKE", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0x7f51c8aaa6b0599abd16674e2b17fec7a9f674a1",
+      "token": "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.25%"
+    }
+  }
+}

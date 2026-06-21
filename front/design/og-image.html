@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BoBe Agent — OG image source</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body { background: #000; }
+
+      /* Exact OG card size. Take the screenshot strictly bounded by .card. */
+      .card {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        color: #fff;
+        background:
+          radial-gradient(900px 500px at 78% -10%, rgba(243, 186, 47, 0.18), transparent 60%),
+          radial-gradient(700px 600px at 8% 110%, rgba(243, 186, 47, 0.07), transparent 55%),
+          linear-gradient(160deg, #0c0c0e 0%, #050506 100%);
+      }
+
+      /* Subtle grid like a trading terminal */
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+        background-size: 60px 60px;
+        mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+      }
+
+      /* Candlestick chart in the background at the bottom */
+      .chart {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 280px;
+        opacity: 0.55;
+      }
+
+      /* Bottom scrim: dims the chart under the text so the lines stay readable. */
+      .scrim {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 210px;
+        z-index: 1;
+        background: linear-gradient(to top, #050506 6%, rgba(5,5,6,0.85) 42%, transparent 100%);
+      }
+
+      .content {
+        position: relative;
+        z-index: 2;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 72px 80px;
+      }
+
+      .top { display: flex; align-items: center; gap: 24px; }
+
+      .logo {
+        width: 112px;
+        height: 112px;
+        border-radius: 26px;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+      }
+
+      .brand-name { font-size: 38px; font-weight: 800; letter-spacing: -0.01em; }
+      .brand-sub {
+        margin-top: 6px;
+        font-size: 22px;
+        font-weight: 500;
+        color: rgba(255,255,255,0.55);
+      }
+
+      .badge {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 11px;
+        padding: 14px 24px;
+        border-radius: 999px;
+        font-size: 22px;
+        font-weight: 600;
+        color: #F3BA2F;
+        background: rgba(243, 186, 47, 0.1);
+        border: 1px solid rgba(243, 186, 47, 0.28);
+      }
+      .badge .dot {
+        width: 11px; height: 11px; border-radius: 50%;
+        background: #F3BA2F;
+        box-shadow: 0 0 12px #F3BA2F;
+      }
+
+      .center { margin-top: -8px; }
+      .title {
+        font-size: 94px;
+        font-weight: 900;
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+      }
+      .title .accent { color: #F3BA2F; }
+
+      .bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .hack {
+        font-size: 26px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.6);
+      }
+      .site {
+        font-size: 28px;
+        font-weight: 700;
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .site .pin { color: #F3BA2F; }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="card">
+      <div class="grid"></div>
+
+      <svg class="chart" viewBox="0 0 1200 300" preserveAspectRatio="none">
+        <!-- Trend line -->
+        <polyline
+          points="0,230 120,210 240,225 360,180 480,195 600,150 720,165 840,110 960,125 1080,70 1200,55"
+          fill="none" stroke="rgba(243,186,47,0.45)" stroke-width="3" />
+        <path
+          d="M0,230 120,210 240,225 360,180 480,195 600,150 720,165 840,110 960,125 1080,70 1200,55 L1200,300 L0,300 Z"
+          fill="rgba(243,186,47,0.06)" />
+
+        <!-- Candles (green = up, red = down) -->
+        <g stroke-width="2">
+          <!-- up -->
+          <line x1="90"  y1="195" x2="90"  y2="245" stroke="#22c55e"/><rect x="80"  y="205" width="20" height="30" fill="#22c55e"/>
+          <line x1="210" y1="200" x2="210" y2="250" stroke="#ef4444"/><rect x="200" y="215" width="20" height="28" fill="#ef4444"/>
+          <line x1="330" y1="165" x2="330" y2="215" stroke="#22c55e"/><rect x="320" y="178" width="20" height="30" fill="#22c55e"/>
+          <line x1="450" y1="172" x2="450" y2="222" stroke="#ef4444"/><rect x="440" y="188" width="20" height="26" fill="#ef4444"/>
+          <line x1="570" y1="135" x2="570" y2="185" stroke="#22c55e"/><rect x="560" y="148" width="20" height="30" fill="#22c55e"/>
+          <line x1="690" y1="145" x2="690" y2="195" stroke="#ef4444"/><rect x="680" y="160" width="20" height="26" fill="#ef4444"/>
+          <line x1="810" y1="95"  x2="810" y2="150" stroke="#22c55e"/><rect x="800" y="108" width="20" height="32" fill="#22c55e"/>
+          <line x1="930" y1="108" x2="930" y2="158" stroke="#ef4444"/><rect x="920" y="122" width="20" height="26" fill="#ef4444"/>
+          <line x1="1050" y1="55" x2="1050" y2="108" stroke="#22c55e"/><rect x="1040" y="68" width="20" height="34" fill="#22c55e"/>
+        </g>
+      </svg>
+
+      <div class="scrim"></div>
+
+      <div class="content">
+        <div class="top">
+          <img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAQAAAD41aSMAAANxklEQVR42u2deZAVxR3HP92z7+3CLsKyyI2IB4oIAZUSD4LggVc8QyxjeYRoUkmpZaqSWEYrHlgxVnkkijESzxRWeeK1iZiEUsGIgmhc5FRBlkNKdl323n3HdP7Y5fH2dGf396YHZj4U8GreTL9f93e6p6e7f79WdEMBKfIHMoHpHM94RlBCfyK+i3qq2MlGVplVrHNrMU3dnKy6+qIfOPoozuYcJjEEx3au9kNSVFLGv8w/zUbSjV2c1KkARSjtTuRq5jIabTsf+zmGbZTyZPoT5XYmQgcBCgGGcy3XMabr+hHhkW08xhPsgvp2X7RrWgpBcSqPcDXFUfELMpCZnGC+dLfFSLX5oo0AReiYuYIFfC9qeMTRjFNn6ErWxd1k1uEsAYpQ+e6N3MMw27YesAzkdJrN6lh6Xy3ICFCEirk3cjsH2bbygCZfnUyjXrWvFrQK0I9GlXcF90TFn3Pi6kR2qE9jtEjgABSiiJ3Kgqjx8YUCjmO1KS8gQasAMdQwFjDFtmWhYSCHqiWmPgk4UISjzE38JOp2+shYatLL4yRRhQDHs5hDbNsUMrZyAWVxtIurmRcVv++M5Sqlk2iNPprzbVsTSua6EwzawDnR/W+FMWoOaHUQc2xbElIUZzNQcwyTbVsSWiYzQTONEtt2hJYhTNdMI8+2HaHF4XjNUbatCDXjNSNt2xBqRmiKbdsQakpUobFtQ7iJph4tEwlgmUgAy0QCWCYSwDKRAJaJBLBMJIBlIgEsEwlgmUgAy0QCWCYSwDKRAJaJBLBMJIBlrEzI93wOqG+zRQoCv+LYNwHSOMRai0NnisXJfNKZyqgyn3RWBVUeXZUNaZI00UQSAyhUIMXwRQBDjLM5h4MzP7r3Z+OZYt13zCGW+RTPpKGzPvfsN5uop4oKtrOFL9jCNzRissQPBr4IoJjHHRa9nwwN7GIDK1nJWipxAySDD5PyLoezmCNt5xQw1LGBt1nCGuoCIoIPAqQ4j0X0s53TLL5lBc/zH6oCIIIv3dD8gMX6GMx5LGQRczmItGVbQvseUMBsFvI0Z+DgWrQjtAIAFDCHp/k9IyzWg1ALAFDCr3iCE63VgtALAJrTeJwLrf16BHAED3KplV+OBGhlOPdynoWGKBIgw3DmM8X3x3EkQBbj+R3FfRyB9UokQBvOYm4kgE3iXMNIX58EkQDtmMRsX+tAYF1UDTv4hK0kM8Nl8TYjSpr8TBZaZgpi5DOAIZQwqA/ZyuNcXqLZt0G6gApQyzM8zWaas+7GtpU1e4ZLtx7ROBQxgsM5kekc3cs4y1MZzRfhFqCBP/AozTjdTCOaLGnSmWNQx04+4mWGMI3LOZMBnn99JFPY5FvbHMhnwMssJNmLIeyWWuGQB+ymlOv4KSs9pxLjOB+HzwMowB4W0dDnJkDh0MQbXMNznns1x/o4fRRAAbayXsgshcMWbuY1j9eNoti3rmgABaiise+JZHD4hrtY6+maoZT41hUNoADSWXfYwGPtQmZ3T3+G+pbbAAqQi0yWssbD+Xk+hlAKhQCKXfzbw/kORWFugnKBywoaeny211V4fSEkAmi+pMq2EZ0i9CZsMOR1qaZ9lRXVVDCqh2e7QP9uXsZSNIst9RURwDCIy5hBURffDgvAiEeC6h6fq/g5F3RTwA28y7NUikggUDKGIuZzVQAKuTtSNPf4XMV4xnd7xplM5DfUCEgg0Dq4zOCygBd/W1+DvuNwKTNF3pYFrDJMbtn8KtDkCW8C2I+jRbqqIrdFlc/zqN4xFDBYNEWXCpF0BARQrGS3aObkMYzK+OfIsJuPRR7CAgJovvA42GWDqcLxOcv4XKT5EKkBtSwXzZw0hkLmCE8yLqMuKDUADMvYI5o9WVymc5JoilW8L5SSiACa9awTzaAkLgdzo3ADtE5s0kgkFcUesTsCBmTcVCUw5PEzZgumCLCMPUJNmtDbicuyDhu19pZDGCs2IWhwuJYbhF8T63hPrOMtJICmjE1CJg3lIpFVCYY0A/k1tzNQyLK9bGKt2Hu1UDqKClaIZfAaziLdp3vMJU0+32cht4gXP7xHhVifSqxuplnK1UJDEsN4gBLeoNpjWA9Fy5hPnKFM5WJOz8nUYi1LSYutHBJz1DYU8kfBMdEGPmAZ2zISJLtxnYijcYgRI59ChnIoRzIms3ZUlgRPchuNYjVA0FPeUMwlzGBQh+PDmNTLts7N+tT1g9npdSwUwxo2e7iyhncppVbwpU40VEHn82IpLuJJH2dZe45LKbexxcPN4ZISDm8g2j9TqE7u1JRVT/SuSfAsd/IN2pNfmPSq0aDPo+SMBv7Mg9RZn68OqQApFnAvTQHIvn0LrOBwFrW8zhaSlkPWhFQAxRQmM48lLOZjGiyKYLsJtIhmHL/gBR7jAoqsxUsJsQAtFPNDnmIhsyzFDQq9AAD9uZBFzGe0hXoQCdDKYG7gGWb4vr4jEiCD4iT+xiUoX0WIBGjDWP7Elb6GGAx4N9RtvRsNKdKkSGFItbtDFXlo8nCI9WFYbi8l3E0DL4bbURugkQ9YxhaSQIIkKVIkSWBItuutaGJoYsSIU0AhhRQxgMEMZxyHMtBzUQ7mLnbxrk/1QFwA08kR723qdu5hMXs63Ott/2/7i6bNt4o4gziCMziPYzwW5iHcydVdjJJKv7KJDke7KIrIa1dsaX7Ao55WOlRyPa8JuEAYXBSjuZxrGePx2qdZ1MnRZr6iUvTBKSiAyyjmcWqHkX/DYI70VJgPcatgT8RFcxx3MMuTDSmaMR2uSFPGXfw3iBMyhkEs4GKBlL7lEj4UboHTjOQuLhe5dz/lx54mcbpHrDa5zOJckZS+5ivx3rHD19zCYpG0jmWmYP0Uy2mM2ULT4LWioQr2ZbSCO1glkJLDbAoE7RLBZbjw8ld5NF/yR5FFxNMYIzZwJybAZMYJmZQ7NEt5VSCd0UwP2tLEPGYIVstcoWjmeWr6nI7DaWKrPIT8A4YwQ8ig3KL5hI8F0pkmFtxSRACXY7/DrzYoKGpYKpDOWI4LkgCKU7rwkg8eho+o63MqcWYLeTGI+AkP2k8aIABFuYhP58mMCIqjtssEJgqY4g8tYTv6zjimBMVR24i7gOYSRaNAEwQFTAiKAAgHAcg1aU/x47rCUCtijYif8OpAO6m2JyYyZLKF5UFx1HZYwV89BASzi6HQ066WLokOfxpYw61CjqoiM2LN3EcZp3TxLuxyGLMCM/tvGMwwD+d/yIIObX0969kRpIhZikZe4fUuTEpxMTMC46BhONxT3JSNLO7kYSsXfUhoTrhlu+XOewXBCmXjcKqnZ8CeHC/cDUrL4BOGg5np6YpdOV4xGjIBXGYywcP5SbbnuAaHSgBDMVd5aoBq2ZrjJVqhEsDlXE72dMUOtue4iEIkQJqJ3ORx2mgN34avBhTmxMe9ZWHKsZ6uMawgkePcBlCAURwm3PMwpDmC+znH43U7eD/ni3QDKMBgLuywvLH3GFLEOZ+nuMhzYb7H5pwXUCBXR1/JR7wCPSww0+GzYW/0FE0xU5nLhb0IWlPLizTlfI10IAUYwr0M4DX2YDr1V9G0rFJu+b/lk0a3LlDPp4AC8iliGOOZxsReTpe+wzIfGohACgCjeZAfsZRtKPLJI9b6V5OPJh+HODHi5FFAnFhrkcdbvQRa/sT6NIhQzVPU+eAjEFABoB+zmUWKffe7v7zMO748IAMrAIASjZ/ohXU8RJMvAgSwF2SfSu72bTfJSIAONHI/peHezNMmzTzEYz56zAf6GeA/jTzMfTT5+MiPBMhiDw/wiK/FHwmQxSbm8xppnzu8kQAANPEG97FGbHewnhMJgMta/sJianyNEbGXkAtg2MxzPMtXres6/CfEAjSzltd5lc8xFnvjvgjgBmxtUJqdrOAfLGcXNsaZsvFBAMV2aoQ3keodLvWU8z+Ws5ItNAnvrtc7fBBAs57XmWftPnOpp4LtbGADn/EFu0mg0Zba/PaIRkvpCsNQfsnZPrlxGBI0UU8t1exmB+XsYCcVNJBEWW5wOuKLAGDQlPjkSWxIkybZupTcYFqjaAWr4PfikwAtBePfo1hl/RtsfOyGBvUetIv9bkDIiQSwTCSAZSIBLBMJYJlIAMtEAlgmEsAykQCWiQSwTCSAZSIBLBMJYJlIAMtEAlgmEsAyer8JdXVgUq+ptG1DqKnSfG3bhlCzU7PJtg2hZqNmtbWdXCNSrNJ8IBLJN6I3VLJKq/WU2bYjtJSxTrvVLAnY4uXw8Jaq0QreYpttS0JJOW8atEKt50XbtoSSUjaAjmFc/s5W29aEjnKexAWniXxi37hFnBYt3fQRl/sTLygacCCBg9rICfvBRmAHDm9zq1PXAC1uIv1I16vNnN6LuF4RvaGcG1gPSVoFaCZOXrlbxaz9YDe2/Z9qfptX6lIPsNdRKkkMvc4kODkwceYPVOrMfB5303tnATKeagnirl5tGpmek7ipES1Um/nmYRL79ovNchVMEE+rVWzj+OhZkCPKuVk9rhLZc2BtfDUTxFzKWMU4DokmK4VJs4zrKSVd3+ZwO2fZJAW45fotajgyqgdiGLbxALeyDurbfdXpy1chSpupzON8xkSvZ33EZTsv8Yz5DLez6fcui7cI43AU5zKHSZSEOahHr0lTwRreZInaSLqr3fu6vb8PQqvkAI5hGtM4ipEUU2g7V/sBDVTyNZtYzQesp1p1u3Xi/wG1X18E1Fvg1QAAAABJRU5ErkJggg==" alt="BoBe App" />
+          <div>
+            <div class="brand-name">Trading Agent</div>
+            <div class="brand-sub">by BoBe App</div>
+          </div>
+          <div class="badge"><span class="dot"></span>Autonomous AI</div>
+        </div>
+
+        <div class="center">
+          <div class="title">AI that trades<br /><span class="accent">BNB&nbsp;Chain</span><br />on its own</div>
+        </div>
+
+        <div class="bottom">
+          <div class="hack">BNB Chain Hackathon</div>
+          <div class="site"><span class="pin">◆</span> agent.bobe.app</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
