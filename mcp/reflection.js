@@ -34,67 +34,6 @@ export async function getTicks(pair, from, to) {
   return rows;
 }
 
-// Analysis of MISSED opportunities: HOLD decisions in a trending STRUCTURE (close>sma20>sma50 or
-// mirrored down), after which the price actually moved in the trend direction ≥ a threshold. This is a signal
-// that the ADX entry threshold (adx_lo) is too strict. The future price is taken from tick_log via horizon_hours.
-export async function getMissedMoves(pair, from, to, { horizon_hours = 4, move_threshold_pct = 3 } = {}) {
-  const { rows } = await query(
-    `WITH holds AS (
-       SELECT id, ts, close, sma20, sma50, atr_pct, adx
-       FROM tick_log
-       WHERE pair=$1 AND action='HOLD' AND ts >= $2 AND ts < $3
-         AND close IS NOT NULL AND sma20 IS NOT NULL AND sma50 IS NOT NULL
-     )
-     SELECT h.*,
-       (SELECT t2.close FROM tick_log t2
-          WHERE t2.pair=$1 AND t2.close IS NOT NULL
-            AND t2.ts >= h.ts + ($4 || ' hours')::interval
-            AND t2.ts <  h.ts + (($4::int * 3) || ' hours')::interval   -- upper bound: protection against "holes" in the journal
-          ORDER BY t2.ts ASC LIMIT 1) AS future_close
-     FROM holds h ORDER BY h.ts`,
-    [pair, from, to, String(horizon_hours)]);
-
-  const gp = await query('SELECT config FROM params WHERE pair=$1 AND is_active', [pair]);
-  const adxLo = gp.rows[0]?.config?.adx_lo ?? null;   // trend-strength threshold in config
-
-  let trendStructured = 0, missedUp = 0, missedDown = 0, sumMissed = 0, adxBlocks = 0;
-  const examples = [];
-  for (const r of rows) {
-    if (r.future_close == null) continue;                       // no "future" — edge of the window
-    const close = Number(r.close), sma20 = Number(r.sma20), sma50 = Number(r.sma50);
-    const movePct = (Number(r.future_close) - close) / close * 100;
-    const upStruct = close > sma20 && sma20 > sma50;
-    const downStruct = close < sma20 && sma20 < sma50;
-    if (!upStruct && !downStruct) continue;                     // no trending structure — not a miss
-    trendStructured++;
-
-    // Which gate likely blocked entry (only the ADX threshold adx_lo from config)
-    const blocked = [];
-    if (r.adx != null && adxLo != null && Number(r.adx) < Number(adxLo)) { adxBlocks++; blocked.push('adx_lo'); }
-
-    const aligned = (upStruct && movePct >= move_threshold_pct) || (downStruct && movePct <= -move_threshold_pct);
-    if (aligned) {
-      if (upStruct) missedUp++; else missedDown++;
-      sumMissed += Math.abs(movePct);
-      if (examples.length < 5) examples.push({
-        ts: r.ts, close, future_close: Number(r.future_close),
-        move_pct: +movePct.toFixed(2), structure: upStruct ? 'up' : 'down', blocked_by: blocked,
-      });
-    }
-  }
-  const missed = missedUp + missedDown;
-  return {
-    horizon_hours, move_threshold_pct,
-    total_holds: rows.length,
-    trend_structured: trendStructured,          // HOLDs with a trending structure (potential entries)
-    missed_moves: missed,                       // of them, with a real move ≥ threshold in the trend direction
-    missed_up: missedUp, missed_down: missedDown,
-    avg_missed_move_pct: missed ? +(sumMissed / missed).toFixed(2) : 0,
-    gate_blocks: { adx_lo: adxBlocks },   // what blocked most often (the ADX threshold)
-    examples,
-  };
-}
-
 // The active version + the full version history with attached performance (params_perf) for rollback.
 export async function getParamsHistory(pair) {
   const { rows: all } = await query('SELECT * FROM params WHERE pair=$1 ORDER BY version', [pair]);

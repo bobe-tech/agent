@@ -1,6 +1,6 @@
 // Test data factories — the SINGLE source of defaults and row seeders for the test DB.
 // Previously each test file had its own seedParams/seedPosition with diverging defaults
-// (tp_mult=1.5 here, 1.3 there). Here the defaults are defined once, and the seeders write minimally
+// (crsi_buy=15 here, 13 there). Here the defaults are defined once, and the seeders write minimally
 // valid rows for the schema (db/migrations). All inserts go through query() from core/db.js,
 // so they transparently land in the test's ALS transaction and roll back together with it.
 //
@@ -15,19 +15,17 @@ export const DEFAULT_PARAMS_CONFIG = {
   strategy: 'nostop_dca',
   side_mode: 'long',
   sizes_usd: [20, 30, 50],
-  tp_mult: 1.3,
-  adx_lo: 20,
-  adx_hi: 30,
-  avg1_depth_mult_lo: 1.0,
-  avg1_depth_mult_hi: 1.5,
-  avg2_depth_mult: 2.0,
   max_adds: 2,
+  adx_mult_threshold: 30,
+  adx_mult_lo: 1,
+  adx_mult_hi: 1.3,
+  avg2_atr_mult: 3,
+  crsi_window_hours: 3,
+  high_window_hours: 24,
   crsi_buy: 15,
-  crsi_sell: 85,
   crsi_rsi_period: 3,
   crsi_streak_period: 2,
   crsi_rank_period: 100,
-  crsi_prev_max_age_min: 60,
 };
 
 // Build a strategy config on top of the default (without writing to the DB) — for unit tests of pure logic.
@@ -139,12 +137,14 @@ export async function seedTick({
   regime = 'UP_TREND',
   action = 'HOLD',
   close = 2000,
+  live_close = 2000,
+  high_24h = 2050,
   atr_pct = 1.5,
-  sma20 = 1990,
-  sma50 = 1950,
+  daily_vol_pct = 3.0,
   adx = 25,
+  adx_mult = 1,
   crsi = 50,
-  hh20 = null, ll20 = null, hh50 = null, ll50 = null,
+  crsi_min_3h = null,
   expected_move_pct = null,
   confidence = 0.6,
   reason = 'test tick',
@@ -157,14 +157,14 @@ export async function seedTick({
   const v = await ensureParamsVersion(pair, params_version);
   const { rows } = await query(
     `INSERT INTO tick_log (
-       pair, ts, regime, action, close, atr_pct, sma20, sma50, adx, crsi,
-       hh20, ll20, hh50, ll50, expected_move_pct, confidence, reason,
+       pair, ts, regime, action, close, live_close, high_24h, atr_pct, daily_vol_pct, adx, adx_mult,
+       crsi, crsi_min_3h, expected_move_pct, confidence, reason,
        position_id, params_version, live_bid, live_ask, raw_decision)
-     VALUES ($1, COALESCE($2::timestamptz, now()), $3,$4,$5,$6,$7,$8,$9,$10,
-       $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb)
+     VALUES ($1, COALESCE($2::timestamptz, now()), $3,$4,$5,$6,$7,$8,$9,$10,$11,
+       $12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb)
      RETURNING *`,
-    [pair, ts, regime, action, close, atr_pct, sma20, sma50, adx, crsi,
-      hh20, ll20, hh50, ll50, expected_move_pct, confidence, reason,
+    [pair, ts, regime, action, close, live_close, high_24h, atr_pct, daily_vol_pct, adx, adx_mult,
+      crsi, crsi_min_3h, expected_move_pct, confidence, reason,
       position_id, v, live_bid, live_ask, JSON.stringify(raw_decision)],
   );
   return rows[0];

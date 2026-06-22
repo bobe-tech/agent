@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the cron of the BoBe Agent project:
-#   • ONE tick cron every 20 min (:05/:25/:45) → start-all.sh → fan-out of start-pair.sh across all pairs from config.json.
-#     More often is pointless: indicators are on the closed H1 bar, within the hour only the live price changes (take-profit/averaging).
+#   • ONE tick cron every 10 min (:00/:10/:20/:30/:40/:50) → start-all.sh → fan-out of start-pair.sh across all pairs from config.json.
+#     The 10-min cadence feeds the CRSI 3h crossing history in tick_log, while take-profit/averaging react to the live price.
 #   • the reflection-job once a day (00:30) — one line per pair.
 #   • refresh-candles every minute — pulls 1h candles for all pairs into the DB (the source for the web dashboard).
 # Paths and PATH are determined automatically. Run once per machine.
@@ -48,14 +48,14 @@ CRON_PATH="$(printf '%s\n' "${bins[@]}" /usr/bin /bin | awk '!seen[$0]++' | past
 # and a repeated install do not leave an "orphaned" PATH line in someone else's crontab.
 {
   [ -n "$existing" ] && printf '%s\n' "$existing"
-  echo "5,25,45 * * * * PATH=$CRON_PATH $START"          # tick every 20 min — fan-out across all pairs
+  echo "*/10 * * * * PATH=$CRON_PATH $START"             # tick every 10 min — fan-out across all pairs
   echo "* * * * * PATH=$CRON_PATH $CANDLES >> $PROJECT_DIR/logs/candles-all.log 2>&1" # candles into the DB for the dashboard (once a minute)
   for pair in "${PAIRS[@]}"; do
     echo "30 0 * * * PATH=$CRON_PATH PAIR=$pair $REFLECT" # reflection once a day at 00:30
   done
 } | crontab -
 
-echo "✓ cron installed: tick every 20 min (start-all.sh) + reflection 00:30 for pairs: ${PAIRS[*]}"
+echo "✓ cron installed: tick every 10 min (start-all.sh) + reflection 00:30 for pairs: ${PAIRS[*]}"
 echo "  PATH=$CRON_PATH"
 crontab -l | grep -E "$PROJECT_DIR" || true
 echo "View: crontab -l   ·   Remove: ./install-cron.sh --remove"

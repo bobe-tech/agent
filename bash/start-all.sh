@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # BoBe Agent — a single fan-out run of ticks across ALL pairs (one agent per pair).
-# Called by one cron every 20 min (see install-cron.sh) and distributes the work of start-pair.sh across pairs
+# Called by one cron every 10 min (see install-cron.sh) and distributes the work of start-pair.sh across pairs
 # with a concurrency limit. start-pair.sh has its own per-pair lock — pairs do not interfere with each other.
 #
 #   ./start-all.sh                       pairs from core/config.json (all configured)

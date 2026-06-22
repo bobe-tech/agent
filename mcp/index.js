@@ -10,10 +10,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { createPool } from '../core/db.js';
-import { getMarket, freshPrev } from '../core/market.js';
-import { getParams, getState, logTick, openPosition, addToPosition, closePosition, fillOrder, cancelOrder } from './account.js';
+import { getMarket } from '../core/market.js';
+import { getParams, getState, logTick, openPosition, addToPosition, closePosition, fillOrder, cancelOrder, crsiMinOverWindow } from './account.js';
 import {
-  getTrades, getTicks, getParamsHistory, getMissedMoves, upsertRegimeStats, upsertLesson, deactivateLesson,
+  getTrades, getTicks, getParamsHistory, upsertRegimeStats, upsertLesson, deactivateLesson,
   proposeParams, activateParams, rollbackParams, recordParamsPerf, logReflection,
 } from './reflection.js';
 import { makePairCfg, nonNegNum, assertSideAllowed } from './validation.js';
@@ -47,17 +47,15 @@ server.tool(
 
 server.tool(
   'get_market',
-  'Market data for a pair (1h candles from the candles table in the DB — populated by the candles-all.sh cron; Binance is NOT hit in real time) on the last CLOSED H1 bar: close, hv=ATR% (hourly volatility), dv=daily_vol_pct (daily volatility), mv=monthly_vol_pct, CRSI (Connors RSI on the H1 scale: crsi — the current value from the close of the unclosed H1 bar, crsi_prev — the value from the previous tick for detecting a line crossover), SMA20/50, SMA20 slope, HH/LL over 20/50, ADX. Plus pair metadata: base, quote, token_address (the contract address of the base asset — use it for the twak quote). Anti-repaint: the forming bar is dropped; daily volatility — only over fully closed days.',
+  'Market indicators for a pair on H1 candles from the DB (anti-repaint on the last CLOSED bar; Binance is NOT hit live). Returns: close (last closed H1 close, context), live_close (current price = close of the latest candle in the DB), high_24h (highest high over the trailing 24h — the LONG entry anchor), atr_pct=hv (hourly ATR-14 %), daily_vol_pct=dv (daily ATR-14 %), adx, adx_mult (the ADX multiplier applied to every threshold), crsi (current Connors RSI), crsi_min_3h (minimum CRSI over crsi_window_hours, from tick_log history — the entry/averaging gate input), crsi_window_hours. Plus pair metadata: base, quote, token_address (use for the twak quote).',
   {
     pair: z.string().describe('Trading pair, e.g. "ETH/USDT". Must be configured in config.json.'),
-    slope_lag: z.number().int().min(2).max(10).default(3).describe('How many bars back to take SMA20 for estimating the slope (params.slope_lag).'),
     timeframe: z.enum(['H1', 'H4', 'D1']).default('H1').describe('Bar timeframe. Default H1.'),
-    limit: z.number().int().min(60).max(1000).default(720).describe('How many of the latest bars to load. Default 720 (~30 days of H1 — needed for daily ATR-14 volatility and indicator warm-up).'),
+    limit: z.number().int().min(60).max(1000).default(720).describe('How many of the latest bars to load. Default 720 (~30 days of H1 — needed for daily ATR-14 and CRSI warm-up).'),
   },
-  async ({ pair, slope_lag, timeframe, limit }) => {
+  async ({ pair, timeframe, limit }) => {
     try {
       const cfg = pairCfg(pair);
-      // CRSI periods and the freshness threshold — from the active config (with Connors defaults).
       const { rows: pr } = await pool.query('SELECT config FROM params WHERE pair=$1 AND is_active', [pair]);
       const c = pr[0]?.config || {};
       const crsi_periods = {
@@ -65,20 +63,24 @@ server.tool(
         streak_period: Number(c.crsi_streak_period ?? 2),
         rank_period: Number(c.crsi_rank_period ?? 100),
       };
-      const maxAge = Number(c.crsi_prev_max_age_min ?? 60);
-      // the previous CRSI value from the last tick_log row (for detecting a crossover across ticks).
-      const { rows: lt } = await pool.query(
-        'SELECT crsi, ts FROM tick_log WHERE pair=$1 AND crsi IS NOT NULL ORDER BY id DESC LIMIT 1', [pair]);
-      const market = await getMarket(cfg, { slope_lag, timeframe, limit, crsi_periods });
-      const prev = freshPrev(lt[0], Date.now(), maxAge);
-      return ok({ ...market, crsi_prev: prev.crsi_prev, crsi_prev_ts: lt[0]?.ts ?? null, crsi_prev_age_min: prev.crsi_prev_age_min });
+      const adx_mult = {
+        threshold: Number(c.adx_mult_threshold ?? 30),
+        lo: Number(c.adx_mult_lo ?? 1),
+        hi: Number(c.adx_mult_hi ?? 1.3),
+      };
+      const high_window_hours = Number(c.high_window_hours ?? 24);
+      const crsi_window_hours = Number(c.crsi_window_hours ?? 3);
+      const market = await getMarket(cfg, { timeframe, limit, crsi_periods, adx_mult, high_window_hours });
+      // CRSI history lives in tick_log (the tick cron runs every 10 min). Minimum over the crossing window.
+      const crsi_min_3h = await crsiMinOverWindow(pair, crsi_window_hours);
+      return ok({ ...market, crsi_min_3h, crsi_window_hours });
     } catch (e) { return fail(e); }
   }
 );
 
 server.tool(
   'get_params',
-  'The active strategy params version for a pair. The entire configuration is in the JSON config field (sizes_usd, tp_mult, adx_lo/hi, crsi_buy/crsi_sell, CRSI periods, averaging-depth multipliers, max_adds, hackathon_end).',
+  'The active strategy params version for a pair. The entire configuration is in the JSON config field (side_mode, sizes_usd, max_adds, adx_mult_threshold/lo/hi, avg2_atr_mult, crsi_buy, crsi_window_hours, high_window_hours, CRSI periods, hackathon_end).',
   { pair: z.string().describe('Trading pair, e.g. "ETH/USDT".') },
   async ({ pair }) => {
     try {
@@ -107,8 +109,8 @@ server.tool(
     pair: z.string().describe('Trading pair.'),
     action: z.enum(['OPEN_LONG', 'OPEN_SHORT', 'ADD', 'CLOSE', 'HOLD']).describe('Final action of the tick.'),
     regime: z.enum(['UP_TREND', 'DOWN_TREND', 'RANGE', 'LOWVOL']).describe('Market regime at the tick.'),
-    features: z.record(z.any()).optional().describe('Feature snapshot: close, atr_pct, sma20, sma50, adx, hh20, ll20, hh50, ll50, fng, btc_dom, crsi.'),
-    expected_move_pct: z.number().nullable().optional().describe('Computed take, % (tp_mult·hv).'),
+    features: z.record(z.any()).optional().describe('Feature snapshot: close, live_close, high_24h, atr_pct (hv), daily_vol_pct (dv), adx, adx_mult, crsi, crsi_min_3h, fng, btc_dom.'),
+    expected_move_pct: z.number().nullable().optional().describe('Computed take-profit, % (hv·adx_mult).'),
     live_bid: z.number().nullable().optional().describe('Live bid (selling base→USDT), USD — from the twak quote. The LONG exit/valuation price.'),
     live_ask: z.number().nullable().optional().describe('Live ask (buying USDT→base), USD — from the twak quote. The LONG entry/add-on price.'),
     confidence: z.number().min(0).max(1).nullable().optional().describe('Confidence in the decision 0–1.'),
@@ -135,7 +137,7 @@ server.tool(
     price: z.number().positive().describe('Entry price (ask from the twak quote).'),
     regime_at_entry: z.enum(['UP_TREND', 'DOWN_TREND', 'RANGE', 'LOWVOL']).describe('Regime at entry.'),
     features_at_entry: z.record(z.any()).describe('Feature snapshot at entry.'),
-    expected_move_pct: z.number().nullable().optional().describe('Computed take, % (tp_mult·hv).'),
+    expected_move_pct: z.number().nullable().optional().describe('Computed take-profit, % (hv·adx_mult).'),
     params_version: z.number().int().describe('Active params version.'),
   },
   async (a) => {
@@ -231,24 +233,6 @@ server.tool(
 );
 
 server.tool(
-  'get_missed_moves',
-  'Analysis of MISSED opportunities: HOLD decisions in a trending structure (close>sma20>sma50 or mirrored down), after which the price actually moved in the trend direction ≥ a threshold. A signal that the ADX entry threshold (adx_lo) is too strict. Returns an aggregate: how many trending HOLDs, how many were missed, the average missed move, how often ADX blocked (gate_blocks.adx_lo).',
-  {
-    pair: z.string().describe('Trading pair.'),
-    from: z.string().describe('Window start (ISO).'),
-    to: z.string().describe('Window end (ISO).'),
-    horizon_hours: z.number().int().min(1).max(48).default(4).describe('How many hours after a HOLD to measure the price movement. Default 4.'),
-    move_threshold_pct: z.number().min(0.5).max(20).default(3).describe('Movement threshold in %, above which the opportunity counts as missed. Default 3.'),
-  },
-  async ({ pair, from, to, horizon_hours, move_threshold_pct }) => {
-    try {
-      pairCfg(pair);
-      return ok(await getMissedMoves(pair, from, to, { horizon_hours, move_threshold_pct }));
-    } catch (e) { return fail(e); }
-  }
-);
-
-server.tool(
   'get_params_history',
   'The active params version + the full version history for a pair with attached performance (params_perf) — for comparison and rollback.',
   { pair: z.string().describe('Trading pair.') },
@@ -302,7 +286,7 @@ server.tool(
   'Propose a new params version (changes.config on top of the active/parent one). The config is JSONB with no CHECK in the DB, the allowed ranges are kept by reflection itself (see prompt §5). With auto_apply=true the new version becomes active.',
   {
     pair: z.string().describe('Trading pair.'),
-    changes: z.record(z.any()).describe('Object of param changes; settings — in config, e.g. {"config":{"tp_mult":1.4}}.'),
+    changes: z.record(z.any()).describe('Object of param changes; settings — in config, e.g. {"config":{"crsi_buy":12}}.'),
     reason: z.string().describe('Justification of the change (based on statistics).'),
     auto_apply: z.boolean().default(false).describe('Activate the new version immediately (if it passed the guardrails).'),
     parent_version: z.number().int().optional().describe('Base version (the active one by default).'),

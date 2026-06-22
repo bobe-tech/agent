@@ -25,7 +25,7 @@ Every decision is made by an LLM: a Claude Code agent runs each tick, reads live
 ## Table of contents
 
 - [Architecture](#architecture)
-- [Strategy — no-stop DCA](#strategy--no-stop-dca-in-detail)
+- [Strategy (concept)](#strategy-concept)
 - [Experience analysis (reflection-job)](#experience-analysis-reflection-job-recommendations-only-mode)
 - [MCP tools (the `bobe` server)](#mcp-tools-the-bobe-server)
 - [Installation](#installation-from-scratch)
@@ -42,11 +42,11 @@ Every decision is made by an LLM: a Claude Code agent runs each tick, reads live
 ## Architecture
 
 ```
-cron (5,25,45 * * * *) → bash/start-all.sh → fan-out of bash/start-pair.sh across all pairs (CONCURRENCY, default 10)
+cron (*/10 * * * *) → bash/start-all.sh → fan-out of bash/start-pair.sh across all pairs (CONCURRENCY, default 10)
 bash/start-pair.sh (PAIR) → claude -p (tick-agent, monolithic):
   1. mcp__bobe__get_time      — server UTC (finish timing, bar-close check)
   2. mcp__bobe__get_market    — indicators for the closed H1 bar: hv (ATR%), dv (daily vol),
-                               mv, ADX, CRSI/crsi_prev (H1, by the unclosed bar); + base/quote/token_address. Anti-repaint.
+                               high_24h, ADX/adx_mult, CRSI + crsi_min_3h; + base/quote/token_address. Anti-repaint.
   3. mcp__cmc__*             — Fear & Greed, BTC dominance, (opt.) derivatives — regime tilt
   4. mcp__bobe__get_params    — active configuration (JSONB config)
   5. mcp__bobe__get_state     — active positions (LONG) with nested orders, last_trade_at, lessons, stats
@@ -59,53 +59,18 @@ bash/start-pair.sh (PAIR) → claude -p (tick-agent, monolithic):
 cron (00:30) → bash/reflect-pair.sh (PAIR) → claude -p (reflection-job, does not trade)
 ```
 
-## Strategy — no-stop DCA (in detail)
+## Strategy (concept)
 
-**We trade:** a configurable set of BSC spot pairs (defined in [`core/config.json`](core/config.json)), **LONG only** (`config.side_mode=long`).
-$100 per pair as a ladder of **$20 (entry) + $30 (1st avg.) + $50 (2nd avg.)**. Max one LONG per pair.
-The schema and code remain side-aware (SHORT — a provision for the future/CEX), but the agent does not open shorts.
-
-**Indicators (by closed H1 bars, anti-repaint):** `hv` — hourly vol (ATR-14%), `dv` — daily vol
-(ATR-14% on the daily resample), `mv ≈ dv·√30`, `ADX(14)`, Connors RSI (**CRSI** = (RSI(3)+RSI(streak,2)+PercentRank(ROC1,100))/3 on the H1 scale; the current value — by the close of the unclosed H1 bar, `crsi_prev` — from the previous 20-min tick for detecting a line crossing).
-The live price comes from the twak quote (ask = buy, bid = sell).
-
-**1. Entry** (open the first leg $20) if ALL of the following hold:
-- `ADX ≥ adx_lo` (default 16) — there is a trend;
-- **pullback down (counter-trend dip-buy):** the price dropped below the hourly close by `1·hv` (ADX 16–30) or `1.3·hv` (ADX≥30) — `move% = (close_H1 − ask)/close_H1·100 ≥ thr`. We buy the dip, not the breakout;
-- **CRSI confirmation (crossing the line upward):** `crsi_prev < crsi_buy ≤ crsi`. Per-pair thresholds (`crsi_buy`/`crsi_sell`) are set in the active config. Removes entries "into the knife".
-
-**2. Averaging (down, no stop):**
-- **avg1 ($30):** drawdown from entry ≥ `⅔·dv` (ADX 16–30) or `1·dv` (ADX≥30);
-- **avg2 ($50):** deeper — `3·dv` — AND only on a CRSI line crossing (§3 of the prompt).
-
-**3. Exit — take-profit only:** close the ENTIRE position when `bid` reaches
-`opened_price·(1 + tp_mult·hv)` (`tp_mult` = 1.3 → +130% of the hourly vol from the average). **There is no stop** — we do not exit at a loss
-voluntarily, we wait for a rebound (spot). A hard guard: `close_position` rejects closing at a clean loss
-(except a forced finish with `force=true`).
-
-**4. Hackathon finish:** when `config.hackathon_end` is set — in the last ~24h we do not open new positions;
-~2h before, we forcibly close everything (`force=true`).
-
-### Costs
-
-The trade cost (the spread) is **already baked into the real ask/bid** — it is not subtracted from PnL separately (otherwise double counting).
-**The spread does NOT filter the entry** (no-stop): we enter on a signal and wait for the price to move to profit. The take-profit by construction
-covers the spread — for `bid` to exceed the average (at ask) by `tp_mult·hv`, the price needs to travel the spread + take-profit. The server-side
-`close_position` guard (net>0) does not allow locking in a loss.
-
-> On BSC the real round-trip is wide (~1.4%) → the take-profit is reachable only when the pair moves by spread + take-profit (~2%);
-> positions open and wait. This is the honest reality of the venue (see the cost ceiling in the project notes).
-
-### Per-pair parameters (`params.config`, JSONB)
-
-`side_mode` (long), `sizes_usd` [20,30,50], `tp_mult` (1.3), `adx_lo` (16)/`adx_hi` (30), `crsi_buy`/`crsi_sell` (per-pair crossing thresholds), `crsi_rsi_period`/`crsi_streak_period`/`crsi_rank_period` (3/2/100), `crsi_prev_max_age_min` (60), `avg1_depth_mult_lo/hi`, `avg2_depth_mult` (3), `max_adds` (2),
-`hackathon_end` (opt.). The multipliers auto-scale the thresholds to each pair's volatility —
-one set works for all; per-pair divergence is resolved by fact through reflection.
+BoBe is an autonomous long-only, no-stop DCA agent on BNB Smart Chain. Each 10-minute tick it
+reads market indicators, decides, and executes real on-chain swaps via MCP tools. Entries and
+averagings are gated by an ATR volatility filter (scaled by an ADX multiplier) plus a Connors-RSI
+crossing; exits are take-profit only (it never sells at a loss voluntarily). The full, authoritative
+rules live in `prompts/strategy.md`; tunable thresholds live per-pair in the `params` table.
 
 ## Experience analysis (reflection-job, "recommendations only" mode)
 
 Once a day it reads the journal (`positions`+nested `orders` / `tick_log`) and **only recommends** to the human what is worth
-changing in `config` (net PnL, time to take-profit, averagings, open drawdowns → advice on `tp_mult`/`adx`/`crsi_buy`/`crsi_sell`/depths).
+changing in `config` (net PnL, time to take-profit, averagings, open drawdowns → advice on the take-profit, ADX, Connors-RSI and averaging-depth thresholds).
 **It changes NOTHING active itself:** proposals are created as INACTIVE params versions
 (`propose_params auto_apply=false`), activated by a human. It does not activate/roll back versions, does not write
 lessons/statistics. Its own analysis (what it looked at, conclusions, recommendations) it writes to `reflection_log` via
@@ -114,7 +79,7 @@ lessons/statistics. Its own analysis (what it looked at, conclusions, recommenda
 ## MCP tools (the `bobe` server)
 
 - **Tick:** `get_time`, `get_market`, `get_params`, `get_state` (active positions with nested `orders`), `log_tick`, `open_position`, `add_to_position`, `close_position` (with `force`), `fill_order` (confirm the swap fill: `comp_*`/`tx_id`), `cancel_order` (swap did not go through). Lifecycle: open/add/close create an `active` order → swap → `fill_order`/`cancel_order`.
-- **Reflection (the server has all of them, but the job in "recommendations only" mode uses a subset):** reading — `get_time`, `get_trades`, `get_ticks`, `get_missed_moves`, `get_params_history`; writing — `propose_params` (inactive candidates, `auto_apply=false`), `record_params_perf` and `log_reflection` (an analysis summary into the `reflection_log` table → Telegram). The tools that change the active policy (`activate_params`, `rollback_params`, `upsert_lesson`, `deactivate_lesson`, `upsert_regime_stats`) are NOT included in the reflection allow-list.
+- **Reflection (the server has all of them, but the job in "recommendations only" mode uses a subset):** reading — `get_time`, `get_trades`, `get_ticks`, `get_params_history`; writing — `propose_params` (inactive candidates, `auto_apply=false`), `record_params_perf` and `log_reflection` (an analysis summary into the `reflection_log` table → Telegram). The tools that change the active policy (`activate_params`, `rollback_params`, `upsert_lesson`, `deactivate_lesson`, `upsert_regime_stats`) are NOT included in the reflection allow-list.
 
 Privilege separation is via `--allowedTools`: the tick-agent sees only the tick tools, reflection — only reading + recommendations.
 
@@ -133,7 +98,7 @@ Privilege separation is via `--allowedTools`: the tick-agent sees only the tick 
 3. `npm ci` — project dependencies (a single `node_modules` at the root).
 4. `./db/migrate.sh bobe_agent` — apply the migrations (9 tables; idempotent, `--status` — what is applied).
 5. `bash/install.sh` — seed the parameters for all configured pairs (long-only) and warm up the candles.
-6. `bash/install-cron.sh` — install cron (tick 5,25,45 + reflection 00:30 + candles once a minute; `--remove` to remove).
+6. `bash/install-cron.sh` — install cron (tick */10 + reflection 00:30 + candles once a minute; `--remove` to remove).
 
 The pools and addresses of all pairs — in `core/config.json`.
 
@@ -148,7 +113,7 @@ bash/start-all.sh                        # fan-out of ticks across all pairs (CO
 PAIR=ETH/USDT bash/reflect-pair.sh --dev # reflection of one pair with output
 bash/reflect-all.sh                      # fan-out of reflection across all pairs (once a day)
 bash/candles-all.sh                      # refresh the 1h candles for all pairs in the DB (for the dashboard)
-bash/install-cron.sh                     # tick 5,25,45 + reflection 00:30 + candles once a minute; --remove to remove
+bash/install-cron.sh                     # tick */10 + reflection 00:30 + candles once a minute; --remove to remove
 ```
 
 The scripts are **self-sufficient regarding `PATH`** (they add `~/.local/bin` etc. themselves) — in cron
@@ -298,7 +263,7 @@ UPDATE params SET config = jsonb_set(config,'{hackathon_end}','"2026-06-22T23:59
 psql -d bobe_agent -c "SELECT id,pair,action,regime,close,adx,left(reason,60) FROM tick_log ORDER BY id DESC LIMIT 5;"
 psql -d bobe_agent -c "SELECT id,pair,side,status,opened_amount,opened_price,realized_pnl_pct,force_closed FROM positions ORDER BY id DESC LIMIT 5;"
 psql -d bobe_agent -c "SELECT id,position_id,action,status,comp_size,comp_amount,comp_price,tx_id FROM orders ORDER BY id DESC LIMIT 5;"
-psql -d bobe_agent -c "SELECT pair,config->>'tp_mult' tp,config->>'hackathon_end' fin,config->>'side_mode' side FROM params WHERE is_active ORDER BY pair;"
+psql -d bobe_agent -c "SELECT pair,config->>'hackathon_end' fin,config->>'side_mode' side FROM params WHERE is_active ORDER BY pair;"
 ```
 
 - Logs: `logs/start-pair-<PAIR>-*.log`, `logs/reflect-pair-<PAIR>-*.log`.

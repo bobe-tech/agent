@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  sma, smaPrev, hh, ll, wilderAtr, adx,
+  sma, smaPrev, hh, ll, wilderAtr, adx, adxMult,
   rsiValues, streakSeries, percentRank, connorsRsi,
 } from './indicators.js';
 
@@ -118,4 +118,19 @@ test('wilderAtr on a flat series → 0 (no true range)', () => {
   const a = wilderAtr(flat, 14);
   assert.equal(a.atr_abs, 0);
   assert.equal(a.atr_pct, 0);
+});
+
+test('adxMult: <= threshold → lo, > threshold → hi (boundary inclusive on lo)', () => {
+  const cfg = { threshold: 30, lo: 1, hi: 1.3 };
+  assert.equal(adxMult(10, cfg), 1);
+  assert.equal(adxMult(30, cfg), 1);
+  assert.equal(adxMult(30.0001, cfg), 1.3);
+  assert.equal(adxMult(50, cfg), 1.3);
+});
+
+test('adxMult: defaults applied and null/NaN adx → null', () => {
+  assert.equal(adxMult(40), 1.3);
+  assert.equal(adxMult(20), 1);
+  assert.equal(adxMult(null), null);
+  assert.equal(adxMult(NaN), null);
 });

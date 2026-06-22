@@ -45,8 +45,8 @@ test('toStoreBars / toBinanceList map keys and order', () => {
 });
 
 test('paramsConfig inherits the default and applies overrides', () => {
-  const c = paramsConfig({ tp_mult: 1.7 });
-  assert.equal(c.tp_mult, 1.7);
+  const c = paramsConfig({ crsi_buy: 17 });
+  assert.equal(c.crsi_buy, 17);
   assert.equal(c.side_mode, DEFAULT_PARAMS_CONFIG.side_mode);
   assert.deepEqual(c.sizes_usd, [20, 30, 50]);
 });
@@ -54,7 +54,7 @@ test('paramsConfig inherits the default and applies overrides', () => {
 test('seedParams creates an active version, a repeated seed deactivates the previous one', async () => {
   await withTx(async () => {
     const v1 = await seedParams('ETH/USDT');
-    const v2 = await seedParams('ETH/USDT', { config: { tp_mult: 1.1 } });
+    const v2 = await seedParams('ETH/USDT', { config: { crsi_buy: 11 } });
     assert.ok(v2 > v1);
     const { rows } = await query('SELECT version, is_active FROM params WHERE pair=$1 ORDER BY version', ['ETH/USDT']);
     assert.equal(rows.find((r) => r.version === v1).is_active, false);

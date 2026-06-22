@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeFeatures, normalize, freshPrev, getCandles, getMarket } from './market.js';
+import { computeFeatures, normalize, getCandles, getMarket } from './market.js';
 import { getPool } from '../core/db.js';
 import { withTx, setupTestDb } from '../tests/db.js';
 import { seedCandles } from '../tests/factories.js';
@@ -14,37 +14,38 @@ const bars = Array.from({ length: 60 }, (_, i) => ({
 test('anti-repaint: last bar is NOT closed → dropped (we take the one before)', () => {
   const last = bars.at(-1);
   // now within the interval of the last bar → it's still forming
-  const f = computeFeatures(bars, { now_sec: last.ts + 100, period: 3600, slope_lag: 3 });
+  const f = computeFeatures(bars, { now_sec: last.ts + 100, period: 3600 });
   assert.equal(f.last_raw_closed, false);
   assert.equal(f.latest_bar.close, bars.at(-2).c);   // decision on the previous closed bar
 });
 
 test('anti-repaint: last bar is closed → used', () => {
   const last = bars.at(-1);
-  const f = computeFeatures(bars, { now_sec: last.ts + 7200, period: 3600, slope_lag: 3 });
+  const f = computeFeatures(bars, { now_sec: last.ts + 7200, period: 3600 });
   assert.equal(f.last_raw_closed, true);
   assert.equal(f.latest_bar.close, last.c);
 });
 
 test('boundary exactly at ts+period → the bar counts as closed (>=)', () => {
   const last = bars.at(-1);
-  const f = computeFeatures(bars, { now_sec: last.ts + 3600, period: 3600, slope_lag: 3 });
+  const f = computeFeatures(bars, { now_sec: last.ts + 3600, period: 3600 });
   assert.equal(f.last_raw_closed, true);
   assert.equal(f.latest_bar.close, last.c);
 });
 
-test('output completeness: all strategy fields present (crsi instead of rsi)', () => {
-  const f = computeFeatures(bars, { now_sec: bars.at(-1).ts + 3600, period: 3600, slope_lag: 3 });
-  for (const k of ['latest_bar', 'close', 'atr_pct', 'daily_vol_pct', 'monthly_vol_pct',
-                   'crsi', 'crsi_live_close', 'sma20', 'sma50', 'sma20_prev',
-                   'hh20', 'll20', 'hh50', 'll50', 'adx']) {
+test('output completeness: new strategy fields present, old ones removed', () => {
+  const f = computeFeatures(bars, { now_sec: bars.at(-1).ts + 3600, period: 3600 });
+  for (const k of ['latest_bar', 'close', 'live_close', 'high_24h', 'atr_pct',
+                   'daily_vol_pct', 'adx', 'adx_mult', 'crsi']) {
     assert.ok(k in f, `missing field ${k}`);
   }
-  assert.ok(!('rsi' in f) && !('rsi_prev' in f), 'rsi/rsi_prev should be removed');
-  assert.ok(f.adx !== null, 'adx should be computed on 60 bars');
+  for (const gone of ['sma20', 'sma50', 'sma20_prev', 'hh20', 'll20', 'hh50', 'll50',
+                      'monthly_vol_pct', 'crsi_live_close', 'rsi', 'rsi_prev']) {
+    assert.ok(!(gone in f), `field ${gone} should be removed`);
+  }
 });
 
-test('daily volatility: on a long series dv/mv are computed, mv≈dv·√30', () => {
+test('daily volatility: on a long series dv is computed', () => {
   // 480 H1 bars (~20 days) with a slight saw so TR is non-zero
   const long = Array.from({ length: 480 }, (_, i) => {
     const base = 1000 + (i % 24);           // intraday saw
@@ -52,8 +53,6 @@ test('daily volatility: on a long series dv/mv are computed, mv≈dv·√30', ()
   });
   const f = computeFeatures(long, { now_sec: long.at(-1).ts + 3600, period: 3600 });
   assert.ok(f.daily_vol_pct !== null && Number.isFinite(f.daily_vol_pct), 'dv should be computed (≥15 closed days)');
-  assert.ok(f.monthly_vol_pct !== null, 'mv should be computed');
-  assert.ok(Math.abs(f.monthly_vol_pct - f.daily_vol_pct * Math.sqrt(30)) < 1e-9, 'mv = dv·√30');
 });
 
 test('crsi: computed on a long series and within [0,100]', () => {
@@ -68,18 +67,14 @@ test('crsi: computed on a long series and within [0,100]', () => {
   assert.ok(f.crsi !== null && f.crsi >= 0 && f.crsi <= 100, `crsi outside [0,100]: ${f.crsi}`);
 });
 
-test('crsi: current price — the close of the UNclosed H1 bar', () => {
+test('live_close: close of the latest candle in the DB (forming bar when open)', () => {
   const long = Array.from({ length: 480 }, (_, i) => {
     const base = 1000 + (i % 24);
     return { ts: 1_700_000_000 + i * 3600, o: base, h: base + 3, l: base - 3, c: base + 1, v: 1 };
   });
-  // now within the last bar → it's still forming, its close = the current price
-  const f = computeFeatures(long, {
-    now_sec: long.at(-1).ts + 100, period: 3600,
-    crsi_periods: { rsi_period: 3, streak_period: 2, rank_period: 100 },
-  });
+  const f = computeFeatures(long, { now_sec: long.at(-1).ts + 100, period: 3600 });
   assert.equal(f.last_raw_closed, false);
-  assert.equal(f.crsi_live_close, long.at(-1).c);
+  assert.equal(f.live_close, long.at(-1).c);   // forming bar close = current price
 });
 
 test('crsi: null on a short series (not enough for rank_period)', () => {
@@ -91,6 +86,16 @@ test('empty input → error', () => {
   assert.throws(() => computeFeatures([], { now_sec: 1, period: 3600 }), /no candles/);
 });
 
+test('adx_mult and high_24h are computed from bars + config', () => {
+  const up = Array.from({ length: 60 }, (_, i) => ({ ts: 1_700_000_000 + i * 3600, o: 100 + i, h: 102 + i, l: 99 + i, c: 101 + i, v: 1 }));
+  const f = computeFeatures(up, {
+    now_sec: up.at(-1).ts + 3600, period: 3600,
+    adx_mult: { threshold: 30, lo: 1, hi: 1.3 }, high_window_hours: 24,
+  });
+  assert.ok(f.adx_mult === 1 || f.adx_mult === 1.3, `adx_mult should be a multiplier, got ${f.adx_mult}`);
+  assert.equal(f.high_24h, Math.max(...up.slice(-24).map((b) => b.h)));
+});
+
 test('normalize: ms→sec, ascending, drop malformed rows', () => {
   const raw = [[3_600_000, 1, 2, 0.5, 1.5, 9], [0, 1, 2, 0.5, 1.5, 9], ['x', 1, 2, 3, 4, 5]];
   const out = normalize(raw);
@@ -100,24 +105,6 @@ test('normalize: ms→sec, ascending, drop malformed rows', () => {
   assert.ok(out[0].ts < out[1].ts);            // ascending
 });
 
-test('freshPrev: a fresh value (20 min) is accepted', () => {
-  const now = 1_700_000_000_000;
-  const r = freshPrev({ crsi: 42, ts: new Date(now - 20 * 60000).toISOString() }, now, 60);
-  assert.equal(r.crsi_prev, 42);
-  assert.ok(Math.abs(r.crsi_prev_age_min - 20) < 1e-6);
-});
-
-test('freshPrev: stale (90 min) → null, age is returned', () => {
-  const now = 1_700_000_000_000;
-  const r = freshPrev({ crsi: 42, ts: new Date(now - 90 * 60000).toISOString() }, now, 60);
-  assert.equal(r.crsi_prev, null);
-  assert.ok(Math.abs(r.crsi_prev_age_min - 90) < 1e-6);
-});
-
-test('freshPrev: no data → {null, null}', () => {
-  assert.deepEqual(freshPrev(undefined, 1, 60), { crsi_prev: null, crsi_prev_age_min: null });
-  assert.deepEqual(freshPrev({ crsi: null, ts: null }, 1, 60), { crsi_prev: null, crsi_prev_age_min: null });
-});
 
 test('getCandles: maps interval, normalizes and returns ascending {time,open,high,low,close}', async () => {
   const origFetch = globalThis.fetch;
@@ -195,7 +182,9 @@ test('getMarket(H1): from DB candles computes the full feature set + pair metada
     assert.equal(m.quote, 'USDT');
     assert.equal(m.token_address, '0xabc');
     assert.equal(typeof m.close, 'number');
-    assert.equal(typeof m.sma20, 'number');
+    assert.equal(typeof m.live_close, 'number');
+    assert.equal(typeof m.high_24h, 'number');
+    assert.ok(m.adx_mult === 1 || m.adx_mult === 1.3);
     assert.ok(m.crsi >= 0 && m.crsi <= 100, 'CRSI in [0,100] on a long series');
     assert.ok('adx' in m && 'atr_pct' in m);
   });

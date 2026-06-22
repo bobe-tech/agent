@@ -80,13 +80,13 @@ test('buildMessage position with no fills (opened_price null): does not crash, n
 
 test('buildReflectionMessage: agent summary + proposed inactive versions', () => {
   const t = buildReflectionMessage({
-    summary: 'CAKE: 0 closed, 1 open (−2.6%). ADX dipping below 20 — take a look at adx_lo.',
-    proposals: [{ version: 8, reason: 'tp_mult 1.3→1.1: takes are not reached' }],
+    summary: 'CAKE: 0 closed, 1 open (−2.6%). ADX dipping below 20 — take a look at crsi_buy.',
+    proposals: [{ version: 8, reason: 'crsi_buy 1.3→1.1: takes are not reached' }],
     pair: 'ETH/USDT',
   });
   assert.ok(t.includes('self-learning'));
   assert.ok(t.includes('ADX dipping'));           // the agent's analysis is shown
-  assert.ok(t.includes('v8') && t.includes('tp_mult')); // proposal
+  assert.ok(t.includes('v8') && t.includes('crsi_buy')); // proposal
 });
 
 test('buildMessage without a tick: a warning instead of "undefined"', () => {
@@ -166,10 +166,10 @@ test('buildReflectionMessage without a summary: an explicit "no summary"', () =>
 
 test('buildMessage: HTML entities in reason are decoded (Telegram plain)', () => {
   const t = buildMessage({
-    tick: { action: 'HOLD', reason: 'close &lt; sma20, F&amp;G=14, &quot;risk-off&quot;' },
+    tick: { action: 'HOLD', reason: 'live_close &lt; high_24h, F&amp;G=14, &quot;risk-off&quot;' },
     positions: [], closed: [], pair: 'ETH/USDT',
   });
-  assert.ok(t.includes('close < sma20'));
+  assert.ok(t.includes('live_close < high_24h'));
   assert.ok(t.includes('F&G=14'));
   assert.ok(t.includes('"risk-off"'));
   assert.ok(!t.includes('&lt;') && !t.includes('&amp;'));

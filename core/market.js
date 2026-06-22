@@ -1,7 +1,7 @@
-// Market data → feature set for the strategy (hv/dv/mv, CRSI, ADX, SMA).
+// Market data → feature set for the strategy (hv/dv, CRSI, ADX, ADX multiplier, high_24h).
 // Candle source — the candles table in the DB (populated by the cron getCandles→Binance klines); getMarket
 // (the agent) and the API read ONLY from the DB. Anti-repaint: decisions are made on the last CLOSED bar (by UTC time).
-import { sma, smaPrev, hh, ll, wilderAtr, adx, connorsRsi } from './indicators.js';
+import { hh, wilderAtr, adx, adxMult, connorsRsi } from './indicators.js';
 import { readCandles } from './candles-store.js';
 
 async function fetchOnce(url, timeoutMs = 10000) {
@@ -36,14 +36,6 @@ async function fetchJson(url, timeoutMs = 10000) {
     }
   }
   throw last;
-}
-
-// Freshness guard for the previous CRSI (crossover detection across ticks). prev — the last tick_log row
-// ({crsi, ts}); now_ms — the current time. crsi_prev=null if there is no value or it is older than maxAgeMin.
-export function freshPrev(prev, now_ms, maxAgeMin = 60) {
-  if (!prev || prev.crsi == null || prev.ts == null) return { crsi_prev: null, crsi_prev_age_min: null };
-  const ageMin = (now_ms - new Date(prev.ts).getTime()) / 60000;
-  return { crsi_prev: ageMin <= maxAgeMin ? Number(prev.crsi) : null, crsi_prev_age_min: ageMin };
 }
 
 // Binance klines: [openTime_ms, o, h, l, c, v, closeTime_ms, ...], ascending. We key on openTime
@@ -98,11 +90,10 @@ function dailyVolPct(bars, nowSec) {
   return a?.atr_pct ?? null;
 }
 
-// Pure function: from an array of raw bars (ascending) compute features on the LAST CLOSED bar.
-// Bar ts — Unix seconds UTC = the OPEN time of the bar (Binance openTime ms ÷ 1000). The bar covers [ts, ts+period);
-// it is closed when now >= ts+period. We keep the last raw bar only if it's already closed,
-// otherwise we drop it (anti-repaint). now_sec is a parameter for deterministic tests.
-export function computeFeatures(allBars, { now_sec, period = 3600, slope_lag = 3, crsi_periods = {} } = {}) {
+// Pure function: from an array of raw bars (ascending) compute the strategy features. Bar ts — Unix
+// seconds UTC = the OPEN time of the bar; it is closed when now >= ts+period. Indicators use the last
+// CLOSED bar (anti-repaint); live_close is the close of the latest candle in the DB (forming bar when open).
+export function computeFeatures(allBars, { now_sec, period = 3600, crsi_periods = {}, adx_mult = {}, high_window_hours = 24 } = {}) {
   if (!allBars || allBars.length === 0) throw new Error('no candles');
   const nowSec = now_sec ?? Math.floor(Date.now() / 1000);
   const lastRaw = allBars.at(-1);
@@ -113,29 +104,31 @@ export function computeFeatures(allBars, { now_sec, period = 3600, slope_lag = 3
   const latest = bars.at(-1);
   const atr = wilderAtr(bars, 14);
   const dv = dailyVolPct(bars, nowSec);          // daily volatility, % (ATR-14 over daily bars)
+  const adxVal = adx(bars, 14);
 
-  // CRSI on the H1 scale: history — closed bars; the current value accounts for the close
-  // of the UNclosed H1 bar (if any) as the current price. crsi_prev comes from tick_log (see index.js).
+  // CRSI on the H1 scale: history — closed bars; the current value accounts for the close of the
+  // UNclosed H1 bar (if any) as the current price.
   const closedCloses = bars.map((b) => b.c);
-  const crsi_live_close = last_raw_closed ? latest.c : lastRaw.c;
   const crsiSeries = last_raw_closed ? closedCloses : [...closedCloses, lastRaw.c];
   const crsi = connorsRsi(crsiSeries, crsi_periods);
 
+  // live_close — current price = close of the latest candle in the DB (forming bar when open, else last closed).
+  const live_close = lastRaw.c;
+  // high_24h — highest high over the trailing window (default 24h), forming bar included.
+  const highBars = Math.max(1, Math.round((high_window_hours * 3600) / period));
+  const high_24h = hh(allBars, highBars);
+
   return {
     latest_bar: { ts: latest.ts, open: latest.o, high: latest.h, low: latest.l, close: latest.c },
-    last_raw_closed,                             // whether the last RAW bar was already closed
-    close: latest.c,
-    atr_pct: atr?.atr_pct ?? null,               // hv — hourly volatility
-    daily_vol_pct: dv,                           // dv — daily volatility
-    monthly_vol_pct: dv == null ? null : dv * Math.sqrt(30),  // mv ≈ dv·√30
-    crsi,                                         // Connors RSI (H1 scale, current value)
-    crsi_live_close,                              // the price taken as the close of the current bar
-    sma20: sma(bars, 20),
-    sma50: sma(bars, 50),
-    sma20_prev: smaPrev(bars, 20, slope_lag),    // SMA20 slope_lag bars back (for the slope)
-    hh20: hh(bars, 20), ll20: ll(bars, 20),
-    hh50: hh(bars, 50), ll50: ll(bars, 50),
-    adx: adx(bars, 14),
+    last_raw_closed,
+    close: latest.c,                 // close of the last CLOSED H1 bar (context)
+    live_close,                      // current price for entry/averaging triggers
+    high_24h,                        // LONG entry anchor: highest high over the trailing window
+    atr_pct: atr?.atr_pct ?? null,   // hv — hourly volatility
+    daily_vol_pct: dv,               // dv — daily volatility
+    adx: adxVal,
+    adx_mult: adxMult(adxVal, adx_mult),
+    crsi,                            // Connors RSI (current value)
   };
 }
 
@@ -164,14 +157,12 @@ export async function getCandles(pairCfg, { timeframe = '1h', limit = 300 } = {}
 // pairCfg — an object from config.json (base/quote/token). Reads candles FROM the DB (the candles table, populated by
 // the cron), computes features (anti-repaint). In real time it does NOT hit Binance — only the cron does.
 // We store 1h in the DB; for H4/D1 we resample from 1h. The pair name for the query is base/quote (= the config.json key).
-export async function getMarket(pairCfg, { slope_lag = 3, timeframe = 'H1', limit = 720, now_sec, crsi_periods = {} } = {}) {
+export async function getMarket(pairCfg, { timeframe = 'H1', limit = 720, now_sec, crsi_periods = {}, adx_mult = {}, high_window_hours = 24 } = {}) {
   const pairName = `${pairCfg.base}/${pairCfg.quote}`;
   const period = TF_SECONDS[timeframe] || 3600;
   const factor = period / 3600; // how many 1h bars are in one bar of the period
   const bars1h = await readCandles(pairName, '1h', limit * factor);
   const all = period === 3600 ? bars1h : resampleRaw(bars1h, period);
-  const feats = computeFeatures(all, { now_sec, period, slope_lag, crsi_periods });
-  // Pair metadata for the twak quote: base/quote symbols and the contract address of the base asset.
-  // token_address is needed to quote by address (the twak symbol often isn't found), see strategy.md §0.
+  const feats = computeFeatures(all, { now_sec, period, crsi_periods, adx_mult, high_window_hours });
   return { ...feats, base: pairCfg.base, quote: pairCfg.quote, token_address: pairCfg.token };
 }

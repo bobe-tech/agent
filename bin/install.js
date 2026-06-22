@@ -7,27 +7,21 @@ import { dirname, join } from 'node:path';
 import { createPool, getPool, query } from '../core/db.js';
 import { getCandles } from '../core/market.js';
 import { upsertCandles } from '../core/candles-store.js';
+import { CRSI_BUY } from '../core/crsi-levels.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(readFileSync(join(__dirname, '..', 'core', 'config.json'), 'utf8'));
 
-// per-pair CRSI thresholds (approved by the customer, calibrated on H1).
-const CRSI = {
-  'ETH/USDT':   { buy: 13,   sell: 87.5 },
-  'ASTER/USDT': { buy: 20,   sell: 70 },   // TODO calibrate on H1 history
-  'ADA/USDT':   { buy: 20,   sell: 70 },   // TODO calibrate on H1 history
-  'XRP/USDT':   { buy: 20,   sell: 70 },   // TODO calibrate on H1 history
-  'CAKE/USDT':  { buy: 19.5, sell: 78 },
-};
-
-function configFor(pair) {
-  const c = CRSI[pair];
+export function configFor(pair) {
+  const crsi_buy = CRSI_BUY[pair];
+  if (crsi_buy == null) throw new Error(`configFor: no crsi_buy level for pair ${pair} (add it to core/crsi-levels.js)`);
   return {
     strategy: 'nostop_dca', side_mode: 'long',
-    sizes_usd: [20, 30, 50], tp_mult: 1.3, adx_lo: 16, adx_hi: 30,
-    avg1_depth_mult_lo: 0.6667, avg1_depth_mult_hi: 1.0, avg2_depth_mult: 3.0, max_adds: 2,
-    crsi_buy: c.buy, crsi_sell: c.sell,
-    crsi_rsi_period: 3, crsi_streak_period: 2, crsi_rank_period: 100, crsi_prev_max_age_min: 60,
+    sizes_usd: [20, 30, 50], max_adds: 2,
+    adx_mult_threshold: 30, adx_mult_lo: 1, adx_mult_hi: 1.3,
+    avg2_atr_mult: 3, crsi_window_hours: 3, high_window_hours: 24,
+    crsi_buy,
+    crsi_rsi_period: 3, crsi_streak_period: 2, crsi_rank_period: 100,
   };
 }
 

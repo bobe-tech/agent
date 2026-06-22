@@ -13,7 +13,7 @@ export function dashboardHandlers() {
         version: 1,
         pair: 'ETH/USDT',
         is_active: true,
-        config: { tp_mult: 1.3 },
+        config: { crsi_buy: 13 },
         source: 'seed',
         reason: null,
         created_at: '2026-06-19T00:00:00Z',

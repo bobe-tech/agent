@@ -127,3 +127,9 @@ export function adx(bars, n = 14) {
   for (let i = n; i < dx.length; i++) adxVal = (adxVal * (n - 1) + dx[i]) / n;
   return adxVal;
 }
+
+// ADX multiplier: lo up to and including the threshold, hi above it. null when adx is unknown.
+export function adxMult(adx, { threshold = 30, lo = 1, hi = 1.3 } = {}) {
+  if (adx == null || !Number.isFinite(adx)) return null;
+  return adx > threshold ? hi : lo;
+}

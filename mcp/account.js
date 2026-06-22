@@ -14,6 +14,15 @@ function legCapUsd(config) {
   return Math.max(...sizes.map(Number)) * 2;
 }
 
+// Minimum CRSI over the trailing window (entry/averaging crossing gate input). null when no rows.
+export async function crsiMinOverWindow(pair, windowHours) {
+  const { rows } = await query(
+    `SELECT MIN(crsi)::float8 AS crsi_min FROM tick_log
+      WHERE pair=$1 AND crsi IS NOT NULL AND ts >= now() - ($2 || ' hours')::interval`,
+    [pair, String(windowHours)]);
+  return rows[0]?.crsi_min ?? null;
+}
+
 // Active params version for a pair.
 export async function getParams(pair) {
   const { rows } = await query('SELECT * FROM params WHERE pair=$1 AND is_active LIMIT 1', [pair]);
@@ -289,17 +298,17 @@ export async function logTick(pair, d) {
   const f = d.features || {};
   const { rows } = await query(
     `INSERT INTO tick_log
-       (pair, regime, action, close, atr_pct, sma20, sma50, adx, hh20, ll20, hh50, ll50, fng, btc_dom,
-        expected_move_pct,
-        confidence, reason, applied_lessons, position_id, params_version, live_bid, live_ask, raw_decision, crsi)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+       (pair, regime, action, close, live_close, high_24h, atr_pct, daily_vol_pct, adx, adx_mult,
+        crsi, crsi_min_3h, fng, btc_dom, expected_move_pct,
+        confidence, reason, applied_lessons, position_id, params_version, live_bid, live_ask, raw_decision)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
      RETURNING id`,
-    [pair, d.regime, d.action, f.close ?? null, f.atr_pct ?? null, f.sma20 ?? null, f.sma50 ?? null,
-     f.adx ?? null, f.hh20 ?? null, f.ll20 ?? null, f.hh50 ?? null, f.ll50 ?? null, f.fng ?? null,
-     f.btc_dom ?? null, d.expected_move_pct ?? null,
+    [pair, d.regime, d.action, f.close ?? null, f.live_close ?? null, f.high_24h ?? null,
+     f.atr_pct ?? null, f.daily_vol_pct ?? null, f.adx ?? null, f.adx_mult ?? null,
+     f.crsi ?? null, f.crsi_min_3h ?? null, f.fng ?? null, f.btc_dom ?? null, d.expected_move_pct ?? null,
      d.confidence ?? null, d.reason ?? null,
      d.applied_lessons ? JSON.stringify(d.applied_lessons) : null,
      d.position_id ?? null,
-     d.params_version, d.live_bid ?? null, d.live_ask ?? null, JSON.stringify(d), f.crsi ?? null]);
+     d.params_version, d.live_bid ?? null, d.live_ask ?? null, JSON.stringify(d)]);
   return { ok: true, tick_id: rows[0].id };
 }

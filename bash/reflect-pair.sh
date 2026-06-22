@@ -50,7 +50,7 @@ done
 # DELIBERATELY EXCLUDED are the tools that change what the tick-agent reads: activate_params, rollback_params
 # (switch the active version), upsert_lesson/deactivate_lesson, upsert_regime_stats (the tick-agent reads them).
 # Reflection does NOT trade and changes NOTHING active — it only advises a human (a summary in Telegram).
-TOOLS="mcp__bobe__get_time,mcp__bobe__get_trades,mcp__bobe__get_ticks,mcp__bobe__get_missed_moves,mcp__bobe__get_params_history,mcp__bobe__propose_params,mcp__bobe__record_params_perf,mcp__bobe__log_reflection"
+TOOLS="mcp__bobe__get_time,mcp__bobe__get_trades,mcp__bobe__get_ticks,mcp__bobe__get_params_history,mcp__bobe__propose_params,mcp__bobe__record_params_perf,mcp__bobe__log_reflection"
 
 run_claude() {
   claude -p "$(cat prompts/reflection.md)" \
