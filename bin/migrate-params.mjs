@@ -4,7 +4,16 @@
 // schema (single atomic statement, no version bump — an "in-place edit" per reflection.md §0a).
 // Idempotent: a pair already on the new schema is skipped. Run once at the rework deploy; NOT on every
 // deploy (it must not run in install.js's always-run path, which would clobber tuned params).
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { createPool, getPool, query } from '../core/db.js';
+
+// Load <project>/.env when run directly — the deploy invokes `node bin/migrate-params.mjs` without
+// exporting DB_* first, so without this the pg client gets no password (SCRAM auth fails). Optional:
+// if the file is absent or env is already set, we silently keep the current environment.
+function loadEnv() {
+  try { process.loadEnvFile?.(join(dirname(fileURLToPath(import.meta.url)), '..', '.env')); } catch { /* .env optional */ }
+}
 
 const OLD_KEYS = ['tp_mult', 'adx_lo', 'adx_hi', 'avg1_depth_mult_lo', 'avg1_depth_mult_hi',
   'avg2_depth_mult', 'crsi_sell', 'crsi_prev_max_age_min'];
@@ -38,6 +47,7 @@ export async function migrateParams() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  loadEnv();
   createPool();
   migrateParams().then(() => getPool().end()).catch((e) => { console.error(e); process.exit(1); });
 }
