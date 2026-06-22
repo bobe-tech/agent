@@ -71,7 +71,7 @@ The live price comes from the twak quote (ask = buy, bid = sell).
 
 **1. Entry** (open the first leg $20) if ALL of the following hold:
 - `ADX ≥ adx_lo` (default 16) — there is a trend;
-- **momentum up:** the price moved up from the hourly close by `1·hv` (ADX 16–30) or `1.3·hv` (ADX≥30);
+- **pullback down (counter-trend dip-buy):** the price dropped below the hourly close by `1·hv` (ADX 16–30) or `1.3·hv` (ADX≥30) — `move% = (close_H1 − ask)/close_H1·100 ≥ thr`. We buy the dip, not the breakout;
 - **CRSI confirmation (crossing the line upward):** `crsi_prev < crsi_buy ≤ crsi`. Per-pair thresholds (`crsi_buy`/`crsi_sell`): BTCB 21.8/76, ETH 13/87.5, WBNB 17.3/79.8, CAKE 19.5/78. Removes entries "into the knife".
 
 **2. Averaging (down, no stop):**
