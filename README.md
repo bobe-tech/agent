@@ -11,7 +11,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**BoBe Agent** is an autonomous trading agent built for the **[CoinMarketCap API Hackathon](https://coinmarketcap.com/api/hackathon/)** (BNB HACK · CoinMarketCap × Trust Wallet × BNB Chain). It trades **4 BSC pairs, LONG only**, with a **no-stop DCA** strategy — averaging down without a stop-loss plus a dynamic, volatility-scaled take-profit. A separate daily *reflection-job* reviews the trade journal and recommends parameter tweaks (it never trades or changes the live config itself).
+**BoBe Agent** is an autonomous trading agent built for the **[CoinMarketCap API Hackathon](https://coinmarketcap.com/api/hackathon/)** (BNB HACK · CoinMarketCap × Trust Wallet × BNB Chain). It trades **a configurable set of BSC pairs, LONG only**, with a **no-stop DCA** strategy — averaging down without a stop-loss plus a dynamic, volatility-scaled take-profit. A separate daily *reflection-job* reviews the trade journal and recommends parameter tweaks (it never trades or changes the live config itself).
 
 Every decision is made by an LLM: a Claude Code agent runs each tick, reads live market data and prices, and calls MCP tools to open / average / close positions. Live prices come from a real twak quote (bid/ask), and every trade executes as a **real on-chain swap** via twak.
 
@@ -61,7 +61,7 @@ cron (00:30) → bash/reflect-pair.sh (PAIR) → claude -p (reflection-job, does
 
 ## Strategy — no-stop DCA (in detail)
 
-**We trade:** 4 BSC pairs (BTCB, ETH, WBNB, CAKE), **LONG only** (`config.side_mode=long`).
+**We trade:** a configurable set of BSC spot pairs (defined in [`core/config.json`](core/config.json)), **LONG only** (`config.side_mode=long`).
 $100 per pair as a ladder of **$20 (entry) + $30 (1st avg.) + $50 (2nd avg.)**. Max one LONG per pair.
 The schema and code remain side-aware (SHORT — a provision for the future/CEX), but the agent does not open shorts.
 
@@ -72,7 +72,7 @@ The live price comes from the twak quote (ask = buy, bid = sell).
 **1. Entry** (open the first leg $20) if ALL of the following hold:
 - `ADX ≥ adx_lo` (default 16) — there is a trend;
 - **pullback down (counter-trend dip-buy):** the price dropped below the hourly close by `1·hv` (ADX 16–30) or `1.3·hv` (ADX≥30) — `move% = (close_H1 − ask)/close_H1·100 ≥ thr`. We buy the dip, not the breakout;
-- **CRSI confirmation (crossing the line upward):** `crsi_prev < crsi_buy ≤ crsi`. Per-pair thresholds (`crsi_buy`/`crsi_sell`): BTCB 21.8/76, ETH 13/87.5, WBNB 17.3/79.8, CAKE 19.5/78. Removes entries "into the knife".
+- **CRSI confirmation (crossing the line upward):** `crsi_prev < crsi_buy ≤ crsi`. Per-pair thresholds (`crsi_buy`/`crsi_sell`) are set in the active config. Removes entries "into the knife".
 
 **2. Averaging (down, no stop):**
 - **avg1 ($30):** drawdown from entry ≥ `⅔·dv` (ADX 16–30) or `1·dv` (ADX≥30);
@@ -132,20 +132,20 @@ Privilege separation is via `--allowedTools`: the tick-agent sees only the tick 
    - The twak wallet itself is configured in the `twak` MCP (see `.mcp.json`). Trades are real on-chain swaps, so fund the wallet only when you are ready to trade.
 3. `npm ci` — project dependencies (a single `node_modules` at the root).
 4. `./db/migrate.sh bobe_agent` — apply the migrations (9 tables; idempotent, `--status` — what is applied).
-5. `bash/install.sh` — seed the parameters (4 pairs: BTCB/ETH/WBNB/CAKE, long-only) and warm up the candles.
+5. `bash/install.sh` — seed the parameters for all configured pairs (long-only) and warm up the candles.
 6. `bash/install-cron.sh` — install cron (tick 5,25,45 + reflection 00:30 + candles once a minute; `--remove` to remove).
 
-The pools and addresses of the 4 pairs — in `core/config.json`.
+The pools and addresses of all pairs — in `core/config.json`.
 
 ## Running (manually)
 
 The scripts are symmetric: `*-pair.sh` — a worker for one pair, `*-all.sh` — a fan-out across all pairs.
 
 ```bash
-PAIR=WBNB/USDT bash/start-pair.sh --dev # one tick of one pair with live output
-PAIR=WBNB/USDT bash/start-pair.sh       # quietly (as in cron)
+PAIR=ETH/USDT bash/start-pair.sh --dev # one tick of one pair with live output
+PAIR=ETH/USDT bash/start-pair.sh       # quietly (as in cron)
 bash/start-all.sh                        # fan-out of ticks across all pairs (CONCURRENCY=10; CONCURRENCY=4 — gentler on rate-limit)
-PAIR=WBNB/USDT bash/reflect-pair.sh --dev # reflection of one pair with output
+PAIR=ETH/USDT bash/reflect-pair.sh --dev # reflection of one pair with output
 bash/reflect-all.sh                      # fan-out of reflection across all pairs (once a day)
 bash/candles-all.sh                      # refresh the 1h candles for all pairs in the DB (for the dashboard)
 bash/install-cron.sh                     # tick 5,25,45 + reflection 00:30 + candles once a minute; --remove to remove

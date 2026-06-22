@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bin/install.js — initial project seeding: params for 4 pairs (long-only) + candle warm-up.
+// bin/install.js — initial project seeding: params for all configured pairs (long-only) + candle warm-up.
 // Run from bash/install.sh ONCE at deployment. Idempotent (params — NOT EXISTS by pair).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -13,10 +13,11 @@ const config = JSON.parse(readFileSync(join(__dirname, '..', 'core', 'config.jso
 
 // per-pair CRSI thresholds (approved by the customer, calibrated on H1).
 const CRSI = {
-  'BTCB/USDT': { buy: 21.8, sell: 76 },
-  'ETH/USDT':  { buy: 13,   sell: 87.5 },
-  'WBNB/USDT': { buy: 17.3, sell: 79.8 },
-  'CAKE/USDT': { buy: 19.5, sell: 78 },
+  'ETH/USDT':   { buy: 13,   sell: 87.5 },
+  'ASTER/USDT': { buy: 20,   sell: 70 },   // TODO calibrate on H1 history
+  'ADA/USDT':   { buy: 20,   sell: 70 },   // TODO calibrate on H1 history
+  'XRP/USDT':   { buy: 20,   sell: 70 },   // TODO calibrate on H1 history
+  'CAKE/USDT':  { buy: 19.5, sell: 78 },
 };
 
 function configFor(pair) {
@@ -58,7 +59,7 @@ async function main() {
   createPool();
   try {
     await seedParams();
-    console.log('[install] params seeded (4 pairs, long-only)');
+    console.log('[install] params seeded (all configured pairs, long-only)');
     await warmupCandles();
     console.log('[install] done');
   } finally {

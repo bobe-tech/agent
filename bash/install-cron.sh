@@ -7,7 +7,7 @@
 # Paths and PATH are determined automatically. Run once per machine.
 #
 #   ./install-cron.sh                      pairs from core/config.json (for reflection)
-#   ./install-cron.sh ETH/USDT WBNB/USDT    an explicit list of pairs (for reflection)
+#   ./install-cron.sh ETH/USDT ADA/USDT    an explicit list of pairs (for reflection)
 #   ./install-cron.sh --remove             remove only the lines of this project
 set -euo pipefail
 

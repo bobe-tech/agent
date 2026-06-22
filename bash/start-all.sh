@@ -4,7 +4,7 @@
 # with a concurrency limit. start-pair.sh has its own per-pair lock — pairs do not interfere with each other.
 #
 #   ./start-all.sh                       pairs from core/config.json (all configured)
-#   ./start-all.sh ETH/USDT WBNB/USDT     only the specified pairs
+#   ./start-all.sh ETH/USDT ADA/USDT     only the specified pairs
 #   CONCURRENCY=4 ./start-all.sh         limit concurrency (default 10 — all pairs at once)
 set -uo pipefail
 

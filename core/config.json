@@ -1,23 +1,29 @@
 {
   "quote_token": { "symbol": "USDT", "address": "0x55d398326f99059fF775485246999027B3197955", "decimals": 18 },
   "pairs": {
-    "BTCB/USDT": {
-      "base": "BTCB", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0x46cf1cf8c69595804ba91dfdd8d6b960c9b0a7c4",
-      "token": "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
-    },
     "ETH/USDT": {
       "base": "ETH", "quote": "USDT", "chain": "bsc", "network": "bsc",
       "pool": "0xbe141893e4c6ad9272e8c04bab7e6a10604501a5",
       "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8", "decimals": 18,
       "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
     },
-    "WBNB/USDT": {
-      "base": "WBNB", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0x172fcd41e0913e95784454622d1c3724f546f849",
-      "token": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.01%"
+    "ASTER/USDT": {
+      "base": "ASTER", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0x7e58f160b5b77b8b24cd9900c09a3e730215ac47",
+      "token": "0x000ae314e2a2172a039b26378814c252734f556a", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
+    },
+    "ADA/USDT": {
+      "base": "ADA", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0x29c5ba7dbb67a4af999a28cc380ad234fe7c1b86",
+      "token": "0x3ee2200efb3400fabb9aacf31297cbdd1d435d47", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.25%"
+    },
+    "XRP/USDT": {
+      "base": "XRP", "quote": "USDT", "chain": "bsc", "network": "bsc",
+      "pool": "0x71f5a8f7d448e59b1ede00a19fe59e05d125e742",
+      "token": "0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe", "decimals": 18,
+      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.25%"
     },
     "CAKE/USDT": {
       "base": "CAKE", "quote": "USDT", "chain": "bsc", "network": "bsc",

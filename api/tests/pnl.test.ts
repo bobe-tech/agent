@@ -45,7 +45,7 @@ describe('PnL routes', () => {
   it('GET /api/pnl/portfolio returns the summary and the per-pair breakdown', async () => {
     await withTestTx(async () => {
       // by_pair includes ALL configured pairs from config (listPairs()), not only those that have trades.
-      // ETH/USDT — we seed 2 trades; WBNB/USDT — the pair is in config but has no trades → realized_usd===0.
+      // ETH/USDT — we seed 2 trades; XRP/USDT — the pair is in config but has no trades → realized_usd===0.
       await seedClosed('ETH/USDT', 5, 2);
       await seedClosed('ETH/USDT', 4, 3);
       const res = await app.inject({ method: 'GET', url: '/api/pnl/portfolio' });
@@ -57,10 +57,10 @@ describe('PnL routes', () => {
       expect(body.total.realized_usd).toBeGreaterThanOrEqual(9);
       // ETH/USDT: actual seeded PnL
       expect(body.by_pair.find((p) => p.pair === 'ETH/USDT')?.realized_usd).toBeGreaterThan(0);
-      // WBNB/USDT: always present (pair is in config), no trades → zero PnL
-      const bnb = body.by_pair.find((p) => p.pair === 'WBNB/USDT');
-      expect(bnb).toBeDefined();
-      expect(bnb?.realized_usd).toBe(0);
+      // XRP/USDT: always present (pair is in config), no trades → zero PnL
+      const xrp = body.by_pair.find((p) => p.pair === 'XRP/USDT');
+      expect(xrp).toBeDefined();
+      expect(xrp?.realized_usd).toBe(0);
     });
   });
 

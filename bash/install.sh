@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Initial project seeding: params (4 pairs, long-only) + warming up the candles. Run ONCE after the migrations.
+# Initial project seeding: params (all configured pairs, long-only) + warming up the candles. Run ONCE after the migrations.
 #   ./bash/install.sh
 set -uo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

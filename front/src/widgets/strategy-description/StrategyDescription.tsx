@@ -37,7 +37,7 @@ export function StrategyDescription() {
       <div>
         <h4 className="font-semibold">Execution</h4>
         <p className="mt-1 text-muted">
-          We trade 4 BSC pairs (BTCB, ETH, BNB, CAKE) through the Trust Wallet Agent Kit on PancakeSwap.
+          We trade a configurable set of BSC pairs through the Trust Wallet Agent Kit on PancakeSwap.
         </p>
       </div>
 

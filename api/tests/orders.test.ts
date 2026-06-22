@@ -81,16 +81,16 @@ describe('GET /api/orders', () => {
     });
   });
 
-  it('filter pair=WBNB/USDT does not return ETH/USDT orders', async () => {
+  it('filter pair=XRP/USDT does not return ETH/USDT orders', async () => {
     await withTestTx(async () => {
       await seedPositionWithOrders('ETH/USDT');
       const res = await app.inject({
         method: 'GET',
-        url: '/api/orders?pair=WBNB%2FUSDT',
+        url: '/api/orders?pair=XRP%2FUSDT',
       });
       expect(res.statusCode).toBe(200);
       const body = res.json() as { orders: unknown[] };
-      // There must be no ETH orders in the results of the BNB filter
+      // There must be no ETH orders in the results of the XRP filter
       expect(body.orders).toHaveLength(0);
     });
   });
