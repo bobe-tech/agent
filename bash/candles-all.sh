@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BoBe Agent — refreshing the candles (1h for ALL pairs) in the candles table for the web dashboard.
 # Called by cron once a minute (see install-cron.sh). The API reads candles ONLY from the DB — the request
-# path is decoupled from GeckoTerminal (no 429/502 for the user). 4h/1d are resampled from 1h on read.
+# path is decoupled from Binance (no 429/502 for the user). 4h/1d are resampled from 1h on read.
 #
 #   ./candles-all.sh
 set -uo pipefail

@@ -91,10 +91,12 @@ test('empty input → error', () => {
   assert.throws(() => computeFeatures([], { now_sec: 1, period: 3600 }), /no candles/);
 });
 
-test('normalize: newest-first → ascending, drop malformed rows', () => {
-  const raw = [[3600, 1, 2, 0.5, 1.5, 9], [0, 1, 2, 0.5, 1.5, 9], ['x', 1, 2, 3, 4, 5]];
+test('normalize: ms→sec, ascending, drop malformed rows', () => {
+  const raw = [[3_600_000, 1, 2, 0.5, 1.5, 9], [0, 1, 2, 0.5, 1.5, 9], ['x', 1, 2, 3, 4, 5]];
   const out = normalize(raw);
   assert.equal(out.length, 2);                 // malformed row dropped
+  assert.equal(out[0].ts, 0);
+  assert.equal(out[1].ts, 3600);               // 3_600_000 ms → 3600 s (open time)
   assert.ok(out[0].ts < out[1].ts);            // ascending
 });
 
@@ -117,41 +119,40 @@ test('freshPrev: no data → {null, null}', () => {
   assert.deepEqual(freshPrev({ crsi: null, ts: null }, 1, 60), { crsi_prev: null, crsi_prev_age_min: null });
 });
 
-test('getCandles: maps tf, normalizes and returns ascending {time,open,high,low,close}', async () => {
+test('getCandles: maps interval, normalizes and returns ascending {time,open,high,low,close}', async () => {
   const origFetch = globalThis.fetch;
   let capturedUrl = '';
-  // GeckoTerminal returns newest-first [ts,o,h,l,c,v]; getCandles must return ascending by time.
+  // Binance returns ascending klines [openTime_ms, o,h,l,c,v, closeTime_ms, ...]; getCandles returns
+  // ascending by time in Unix seconds.
   globalThis.fetch = async (url) => {
     capturedUrl = String(url);
     return {
       ok: true,
-      json: async () => ({
-        data: { attributes: { ohlcv_list: [
-          [2000, 11, 12, 10, 11.5, 100],
-          [1000, 10, 11, 9, 10.5, 90],
-        ] } },
-      }),
+      json: async () => ([
+        [1_000_000, 10, 11, 9, 10.5, 90, 1_003_599_999],
+        [2_000_000, 11, 12, 10, 11.5, 100, 2_003_599_999],
+      ]),
     };
   };
   try {
-    const pairCfg = { network: 'bsc', pool: '0xpool', base: 'ETH', quote: 'USDT', token: '0xtok' };
+    const pairCfg = { symbol: 'ETHUSDT', base: 'ETH', quote: 'USDT', token: '0xtok' };
     const bars = await getCandles(pairCfg, { timeframe: '4h', limit: 50 });
     assert.deepEqual(bars, [
-      { time: 1000, open: 10, high: 11, low: 9, close: 10.5 },
-      { time: 2000, open: 11, high: 12, low: 10, close: 11.5 },
+      { time: 1000, open: 10, high: 11, low: 9, close: 10.5, volume: 90 },
+      { time: 2000, open: 11, high: 12, low: 10, close: 11.5, volume: 100 },
     ]);
-    assert.match(capturedUrl, /ohlcv\/hour\?aggregate=4&limit=50/);
-    assert.match(capturedUrl, /token=0xtok/);
+    assert.match(capturedUrl, /symbol=ETHUSDT/);
+    assert.match(capturedUrl, /interval=4h&limit=50/);
   } finally {
     globalThis.fetch = origFetch;
   }
 });
 
-test('getCandles: empty ohlcv_list → empty array (no crash)', async () => {
+test('getCandles: empty klines → empty array (no crash)', async () => {
   const origFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({ ok: true, json: async () => ({ data: { attributes: { ohlcv_list: [] } } }) });
+  globalThis.fetch = async () => ({ ok: true, json: async () => ([]) });
   try {
-    const bars = await getCandles({ network: 'bsc', pool: '0xp' }, { timeframe: '1h', limit: 10 });
+    const bars = await getCandles({ symbol: 'ETHUSDT' }, { timeframe: '1h', limit: 10 });
     assert.deepEqual(bars, []);
   } finally {
     globalThis.fetch = origFetch;
@@ -164,12 +165,12 @@ test('getCandles: transient failure (HTTP 500) → retry → success on the 2nd 
   globalThis.fetch = async () => {
     calls++;
     if (calls === 1) return { ok: false, status: 500, json: async () => ({}) }; // first attempt fails
-    return { ok: true, json: async () => ({ data: { attributes: { ohlcv_list: [[1000, 1, 2, 0.5, 1.5, 9]] } } }) };
+    return { ok: true, json: async () => ([[1_000_000, 1, 2, 0.5, 1.5, 9, 1_003_599_999]]) };
   };
   try {
-    const bars = await getCandles({ network: 'bsc', pool: '0xp' }, { timeframe: '1h', limit: 10 });
+    const bars = await getCandles({ symbol: 'ETHUSDT' }, { timeframe: '1h', limit: 10 });
     assert.equal(calls, 2, 'there should be exactly one retry');
-    assert.deepEqual(bars, [{ time: 1000, open: 1, high: 2, low: 0.5, close: 1.5 }]);
+    assert.deepEqual(bars, [{ time: 1000, open: 1, high: 2, low: 0.5, close: 1.5, volume: 9 }]);
   } finally {
     globalThis.fetch = origFetch;
   }

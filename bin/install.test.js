@@ -24,19 +24,22 @@ test('seedParams creates active params for all config pairs (long-only, version�
   });
 });
 
-// Mock GeckoTerminal: ohlcv_list newest-first from n bars. getCandles → fetch → upsertCandles.
-function mockGeckoFetch(n = 50, failFor = null) {
+// Mock Binance klines: ascending [openTime_ms, o,h,l,c,v, closeTime_ms] from n bars. getCandles → fetch → upsertCandles.
+function mockBinanceFetch(n = 50, failFor = null) {
   return async (url) => {
     if (failFor && String(url).includes(failFor)) throw new Error('network down');
-    const list = Array.from({ length: n }, (_, i) => [1_700_000_000 + i * 3600, 10, 11, 9, 10.5, 100]).reverse();
-    return { ok: true, json: async () => ({ data: { attributes: { ohlcv_list: list } } }) };
+    const list = Array.from({ length: n }, (_, i) => {
+      const openMs = (1_700_000_000 + i * 3600) * 1000;
+      return [openMs, 10, 11, 9, 10.5, 100, openMs + 3_599_999];
+    });
+    return { ok: true, json: async () => list };
   };
 }
 
 test('warmupCandles warms up candles for all config pairs (happy path)', async () => {
   await withTx(async () => {
     const orig = globalThis.fetch;
-    globalThis.fetch = mockGeckoFetch(30);
+    globalThis.fetch = mockBinanceFetch(30);
     try {
       await warmupCandles();
       const { rows } = await query("SELECT pair, count(*)::int AS n FROM candles WHERE tf='1h' GROUP BY pair");
@@ -52,9 +55,8 @@ test('warmupCandles warms up candles for all config pairs (happy path)', async (
 test('warmupCandles: a failure of one pair (ETH) does not derail the warm-up of the others', async () => {
   await withTx(async () => {
     const orig = globalThis.fetch;
-    // Fail ONLY the ETH pool (the address is unique in config) — the other pairs should warm up.
-    const ethPool = '0xbe141893e4c6ad9272e8c04bab7e6a10604501a5';
-    globalThis.fetch = mockGeckoFetch(20, ethPool);
+    // Fail ONLY the ETH symbol (unique in config) — the other pairs should warm up.
+    globalThis.fetch = mockBinanceFetch(20, 'ETHUSDT');
     try {
       await assert.doesNotReject(() => warmupCandles());
       const { rows } = await query("SELECT pair, count(*)::int AS n FROM candles WHERE tf='1h' GROUP BY pair ORDER BY pair");

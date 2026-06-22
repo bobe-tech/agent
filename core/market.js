@@ -1,5 +1,5 @@
 // Market data → feature set for the strategy (hv/dv/mv, CRSI, ADX, SMA).
-// Candle source — the candles table in the DB (populated by the cron getCandles→GeckoTerminal); getMarket
+// Candle source — the candles table in the DB (populated by the cron getCandles→Binance klines); getMarket
 // (the agent) and the API read ONLY from the DB. Anti-repaint: decisions are made on the last CLOSED bar (by UTC time).
 import { sma, smaPrev, hh, ll, wilderAtr, adx, connorsRsi } from './indicators.js';
 import { readCandles } from './candles-store.js';
@@ -22,8 +22,8 @@ async function fetchOnce(url, timeoutMs = 10000) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Retry with backoff: a transient failure → 1s; rate limit (429) → a long pause (GeckoTerminal's burst cap
-// releases in ~10-15s). Up to 4 attempts. Returns success or rethrows the last error.
+// Retry with backoff: a transient failure → 1s; rate limit (429) → a long pause (Binance asks you to back
+// off before the weight window resets, ~10-15s). Up to 4 attempts. Returns success or rethrows the last error.
 async function fetchJson(url, timeoutMs = 10000) {
   let last;
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -46,10 +46,11 @@ export function freshPrev(prev, now_ms, maxAgeMin = 60) {
   return { crsi_prev: ageMin <= maxAgeMin ? Number(prev.crsi) : null, crsi_prev_age_min: ageMin };
 }
 
-// GeckoTerminal ohlcv_list: [ts,o,h,l,c,v], newest-first → ascending, drop malformed rows.
+// Binance klines: [openTime_ms, o, h, l, c, v, closeTime_ms, ...], ascending. We key on openTime
+// (ms → Unix seconds UTC) = the OPEN time of the bar; drop malformed rows and sort ascending.
 export function normalize(list) {
   return (list || [])
-    .map((r) => ({ ts: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] }))
+    .map((r) => ({ ts: Math.floor(+r[0] / 1000), o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] }))
     .filter((b) => Number.isFinite(b.ts) && Number.isFinite(b.o)
       && Number.isFinite(b.h) && Number.isFinite(b.l) && Number.isFinite(b.c))
     .sort((a, b) => a.ts - b.ts);
@@ -98,7 +99,7 @@ function dailyVolPct(bars, nowSec) {
 }
 
 // Pure function: from an array of raw bars (ascending) compute features on the LAST CLOSED bar.
-// GeckoTerminal ts — Unix seconds UTC = the OPEN time of the bar. The bar covers [ts, ts+period);
+// Bar ts — Unix seconds UTC = the OPEN time of the bar (Binance openTime ms ÷ 1000). The bar covers [ts, ts+period);
 // it is closed when now >= ts+period. We keep the last raw bar only if it's already closed,
 // otherwise we drop it (anti-repaint). now_sec is a parameter for deterministic tests.
 export function computeFeatures(allBars, { now_sec, period = 3600, slope_lag = 3, crsi_periods = {} } = {}) {
@@ -138,30 +139,30 @@ export function computeFeatures(allBars, { now_sec, period = 3600, slope_lag = 3
   };
 }
 
-// Mapping a timeframe to a GeckoTerminal endpoint (day|hour) + aggregate. The cron pulls only 1h
-// (4h/1d are resampled from 1h on read in api); the rest are left for the generality of getCandles.
+// Mapping a timeframe to a Binance klines interval. The cron pulls only 1h (4h/1d are resampled from 1h
+// on read in api); the rest are left for the generality of getCandles.
 const CANDLE_TF = {
-  '1h': { tf: 'hour', aggregate: 1 },
-  hour: { tf: 'hour', aggregate: 1 },
-  '4h': { tf: 'hour', aggregate: 4 },
-  '1d': { tf: 'day', aggregate: 1 },
-  day: { tf: 'day', aggregate: 1 },
+  '1h': '1h', hour: '1h',
+  '4h': '4h',
+  '1d': '1d', day: '1d',
 };
 
-// Candles for the chart: fetch GeckoTerminal → normalize → lightweight-charts format
+// Binance public data host (klines only, no API key, no geo restrictions). Overridable via env.
+const BINANCE_API_BASE = process.env.BINANCE_API_BASE || 'data-api.binance.vision';
+
+// Candles for the chart: fetch Binance klines → normalize → lightweight-charts format
 // ({time,open,high,low,close}, time = Unix sec, ascending). Includes the current (unclosed) bar —
 // for a live chart that's fine (unlike the strategy, where anti-repaint is critical).
 export async function getCandles(pairCfg, { timeframe = '1h', limit = 300 } = {}) {
-  const m = CANDLE_TF[timeframe] || CANDLE_TF['1h'];
-  const tokenParam = pairCfg.token ? `&token=${encodeURIComponent(pairCfg.token)}` : '';
-  const url = `https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(pairCfg.network)}/pools/${encodeURIComponent(pairCfg.pool)}/ohlcv/${m.tf}?aggregate=${m.aggregate}&limit=${limit}&currency=usd${tokenParam}`;
+  const interval = CANDLE_TF[timeframe] || '1h';
+  const url = `https://${BINANCE_API_BASE}/api/v3/klines?symbol=${encodeURIComponent(pairCfg.symbol)}&interval=${interval}&limit=${limit}`;
   const json = await fetchJson(url);
-  const bars = normalize(json?.data?.attributes?.ohlcv_list);
-  return bars.map((b) => ({ time: b.ts, open: b.o, high: b.h, low: b.l, close: b.c }));
+  const bars = normalize(json);
+  return bars.map((b) => ({ time: b.ts, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v }));
 }
 
 // pairCfg — an object from config.json (base/quote/token). Reads candles FROM the DB (the candles table, populated by
-// the cron), computes features (anti-repaint). In real time it does NOT hit GeckoTerminal — only the cron does.
+// the cron), computes features (anti-repaint). In real time it does NOT hit Binance — only the cron does.
 // We store 1h in the DB; for H4/D1 we resample from 1h. The pair name for the query is base/quote (= the config.json key).
 export async function getMarket(pairCfg, { slope_lag = 3, timeframe = 'H1', limit = 720, now_sec, crsi_periods = {} } = {}) {
   const pairName = `${pairCfg.base}/${pairCfg.quote}`;

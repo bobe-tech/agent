@@ -162,12 +162,12 @@ positions, tables of positions and ticks (filter by the agent's decision type), 
 conclusions (`reflection_log`) and PnL by pair/portfolio.
 
 It consists of two parts in this same monorepo (a single root `package.json`/`node_modules`):
-- `api/` — a REST API on Fastify + TypeScript (port `3001`), reads the DB and GeckoTerminal.
+- `api/` — a REST API on Fastify + TypeScript (port `3001`), reads the DB and Binance.
 - `front/` — an SPA on React + Vite + TypeScript + Tailwind v4 + HeroUI (port `5173`), calls the API.
 
 Candles: **both the dashboard API and the agent itself** (`mcp get_market`) read them **from the DB** (the `candles` table),
 and it is filled by the cron script `candles-all.sh` (1h for all pairs, once a minute; `install-cron.sh` installs the
-entry) — this is the **only** one that calls GeckoTerminal. 4h/1d are resampled from 1h on read.
+entry) — this is the **only** one that calls Binance. 4h/1d are resampled from 1h on read.
 Therefore the candles cron must be running (on the first run, fill the DB manually, otherwise the tick-agent will get
 empty data and do a HOLD). One-off fill:
 ```bash
@@ -220,7 +220,7 @@ Each test with the DB runs in a transaction with an unconditional ROLLBACK (isol
 - **Two runners, deliberately.** `core/mcp/bin` are run by `node --test` (prod code is executed as raw JS without a build — we test it with that, instantly). `api` (TS) and `front` (jsdom) — `vitest`. Write a new test for core/mcp/bin under `node:test` + `node:assert/strict`.
 - **The DB is real, not a mock.** The money arithmetic lives in SQL — mocking pg is pointless (you would lose exactly what you are checking). Take `setupTestDb()` + wrap the body in `withTx(async () => { ... })` from `tests/db.js`: each test in a transaction with an unconditional ROLLBACK, no leftover garbage.
 - **Data — by factories.** Do not insert rows by hand: `seedParams/seedPosition/seedOrder/seedTick/seedCandles/seedReflection/seedLesson` from `tests/factories.js` (a single source of defaults). Candles — `makeCandles({ pattern })` from `tests/candles.js` (deterministic, without `Math.random`).
-- **External APIs — mock `globalThis.fetch`.** We do not call GeckoTerminal and the rest of the network: we substitute `globalThis.fetch` in the test and restore it in `finally`.
+- **External APIs — mock `globalThis.fetch`.** We do not call Binance and the rest of the network: we substitute `globalThis.fetch` in the test and restore it in `finally`.
 - **Extract pure logic so it can be tested.** If a file performs a side effect on import (a connection to stdio, `process.exit`, reading stdin) — wrap the auto-launch in the guard `process.argv[1] === fileURLToPath(import.meta.url)`, and export the logic (examples: `mcp/validation.js`, `bin/refresh-candles.mjs`, `mcp/record-usage.js`).
 - **Front — RTL + MSW.** Requests are mocked via `@/test/msw` (`server.use(http.get(...))`); an unmocked request fails the test (`onUnhandledRequest: 'error'`). Selectors — by role/`data-testid`, not by text.
 
@@ -302,12 +302,12 @@ psql -d bobe_agent -c "SELECT pair,config->>'tp_mult' tp,config->>'hackathon_end
 ```
 
 - Logs: `logs/start-pair-<PAIR>-*.log`, `logs/reflect-pair-<PAIR>-*.log`.
-- **GeckoTerminal 429:** `CONCURRENCY` defaults to 10; `market.js` does backoff (12s, up to 4 attempts). If noisy — `CONCURRENCY=4 bash/start-all.sh`.
+- **Binance 429:** `CONCURRENCY` defaults to 10; `market.js` does backoff (12s, up to 4 attempts). If noisy — `CONCURRENCY=4 bash/start-all.sh`.
 
 ## Stack
 
 Claude Code (tick-agent + reflection) · MCP server `bobe` on Node.js (`mcp/`, namespace `mcp__bobe__*`) ·
-CMC MCP (market regime) · Trust Wallet `twak` MCP (live quotes + on-chain swaps) · GeckoTerminal (OHLCV) · PostgreSQL · Telegram · bash/cron.
+CMC MCP (market regime) · Trust Wallet `twak` MCP (live quotes + on-chain swaps) · Binance (OHLCV) · PostgreSQL · Telegram · bash/cron.
 **UI:** a shared core `core/` (db/market/indicators) · API `api/` on Fastify + TypeScript · front `front/` on React + Vite + TypeScript + Tailwind v4 + HeroUI (lightweight-charts, React Query).
 
 ## Security

@@ -19,7 +19,7 @@ set -a
 [ -f .env ] && . ./.env
 set +a
 
-: "${CONCURRENCY:=5}"   # pairs in parallel (gentler on the GeckoTerminal rate-limit); market.js does backoff on 429
+: "${CONCURRENCY:=5}"   # pairs in parallel (gentler on the Binance rate-limit); market.js does backoff on 429
 
 # Pairs: from arguments, otherwise the config.json keys, otherwise the default.
 if [ "$#" -gt 0 ]; then

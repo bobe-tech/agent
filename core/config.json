@@ -2,34 +2,24 @@
   "quote_token": { "symbol": "USDT", "address": "0x55d398326f99059fF775485246999027B3197955", "decimals": 18 },
   "pairs": {
     "ETH/USDT": {
-      "base": "ETH", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0xbe141893e4c6ad9272e8c04bab7e6a10604501a5",
-      "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
+      "base": "ETH", "quote": "USDT", "symbol": "ETHUSDT",
+      "token": "0x2170ed0880ac9a755fd29b2688956bd959f933f8", "decimals": 18
     },
     "ASTER/USDT": {
-      "base": "ASTER", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0x7e58f160b5b77b8b24cd9900c09a3e730215ac47",
-      "token": "0x000ae314e2a2172a039b26378814c252734f556a", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.05%"
+      "base": "ASTER", "quote": "USDT", "symbol": "ASTERUSDT",
+      "token": "0x000ae314e2a2172a039b26378814c252734f556a", "decimals": 18
     },
     "ADA/USDT": {
-      "base": "ADA", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0x29c5ba7dbb67a4af999a28cc380ad234fe7c1b86",
-      "token": "0x3ee2200efb3400fabb9aacf31297cbdd1d435d47", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.25%"
+      "base": "ADA", "quote": "USDT", "symbol": "ADAUSDT",
+      "token": "0x3ee2200efb3400fabb9aacf31297cbdd1d435d47", "decimals": 18
     },
     "XRP/USDT": {
-      "base": "XRP", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0x71f5a8f7d448e59b1ede00a19fe59e05d125e742",
-      "token": "0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.25%"
+      "base": "XRP", "quote": "USDT", "symbol": "XRPUSDT",
+      "token": "0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe", "decimals": 18
     },
     "CAKE/USDT": {
-      "base": "CAKE", "quote": "USDT", "chain": "bsc", "network": "bsc",
-      "pool": "0x7f51c8aaa6b0599abd16674e2b17fec7a9f674a1",
-      "token": "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82", "decimals": 18,
-      "dex": "pancakeswap-v3-bsc", "fee_tier": "0.25%"
+      "base": "CAKE", "quote": "USDT", "symbol": "CAKEUSDT",
+      "token": "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82", "decimals": 18
     }
   }
 }

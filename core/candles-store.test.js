@@ -44,12 +44,30 @@ test('readCandles: empty result for an unknown pair', async () => {
 test('upsertCandles round-trip: re-insert updates close, does not multiply rows', async () => {
   await withTx(async () => {
     const ts = 1704067200;
-    await upsertCandles('ZZZ/TEST', '1h', [{ time: ts, open: 1, high: 1, low: 1, close: 1 }]);
-    const n1 = await upsertCandles('ZZZ/TEST', '1h', [{ time: ts, open: 1, high: 3, low: 0.5, close: 2 }]);
+    await upsertCandles('ZZZ/TEST', '1h', [{ time: ts, open: 1, high: 1, low: 1, close: 1, volume: 10 }]);
+    const n1 = await upsertCandles('ZZZ/TEST', '1h', [{ time: ts, open: 1, high: 3, low: 0.5, close: 2, volume: 25 }]);
     assert.ok(n1 >= 1);
     const read = await readCandles('ZZZ/TEST', '1h', 10);
     assert.equal(read.length, 1, 'same (pair,tf,ts) — an update, not a duplicate');
     assert.equal(read[0].c, 2);
+    assert.equal(read[0].v, 25, 'volume is stored and updated on re-insert');
+  });
+});
+
+test('upsertCandles: duplicate ts in one batch — deduped (last wins), no ON CONFLICT crash', async () => {
+  await withTx(async () => {
+    const ts = 1704067200;
+    // A candle source can return two bars with the same open timestamp. A single
+    // INSERT ... ON CONFLICT must not touch the same (pair,tf,ts) twice, so the batch is deduped.
+    const n = await upsertCandles('ZZZ/TEST', '1h', [
+      { time: ts, open: 1, high: 1, low: 1, close: 1 },
+      { time: ts, open: 2, high: 3, low: 0.5, close: 2 }, // same ts, later in the array → wins
+      { time: ts + 3600, open: 5, high: 5, low: 5, close: 5 },
+    ]);
+    assert.ok(n >= 1);
+    const read = await readCandles('ZZZ/TEST', '1h', 10);
+    assert.equal(read.length, 2, 'two distinct ts, the duplicate is collapsed');
+    assert.equal(read[0].c, 2, 'the last bar for the duplicated ts wins');
   });
 });
 

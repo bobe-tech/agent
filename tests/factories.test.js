@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { query } from '../core/db.js';
 import { withTx, setupTestDb } from './db.js';
-import { makeCandles, toStoreBars, toGeckoList, BASE_TS } from './candles.js';
+import { makeCandles, toStoreBars, toBinanceList, BASE_TS } from './candles.js';
 import {
   paramsConfig, seedParams, seedPosition, seedOrder, seedPositionWithOrders,
   seedTick, seedCandles, seedReflection, seedLesson, DEFAULT_PARAMS_CONFIG,
@@ -34,14 +34,14 @@ test('makeCandles: high≥max(o,c), low≤min(o,c), ascending ts, prices positiv
   }
 });
 
-test('toStoreBars / toGeckoList map keys and order', () => {
+test('toStoreBars / toBinanceList map keys and order', () => {
   const bars = makeCandles({ count: 3, pattern: 'linear' });
   const store = toStoreBars(bars);
   assert.deepEqual(Object.keys(store[0]), ['time', 'open', 'high', 'low', 'close', 'volume']);
   assert.equal(store[0].time, bars[0].ts);
-  const gecko = toGeckoList(bars);
-  assert.equal(gecko[0][0], bars[2].ts, 'gecko newest-first: the first = the last bar');
-  assert.equal(gecko.length, 3);
+  const klines = toBinanceList(bars);
+  assert.equal(klines[0][0], bars[0].ts * 1000, 'binance ascending, ms openTime: the first = the first bar');
+  assert.equal(klines.length, 3);
 });
 
 test('paramsConfig inherits the default and applies overrides', () => {

@@ -1,9 +1,9 @@
 export interface PairCfg {
-  network: string;
-  pool: string;
   base: string;
   quote: string;
+  symbol: string;
   token?: string;
+  decimals?: number;
 }
 
 export interface Candle {
@@ -12,6 +12,7 @@ export interface Candle {
   high: number;
   low: number;
   close: number;
+  volume?: number;
 }
 
 export interface MarketFeatures {

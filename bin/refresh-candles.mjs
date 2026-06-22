@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cron job: pulls 1h candles for all pairs from config.json (one request/pair, limit=1000 ≈ 41 days) and
 // upserts them into the candles table; then it prunes stale rows. The API reads candles ONLY from the DB — the request path
-// is decoupled from GeckoTerminal (no 429/502 on the user). Run: node --env-file-if-exists=.env bin/refresh-candles.mjs
+// is decoupled from Binance (no 429/502 on the user). Run: node --env-file-if-exists=.env bin/refresh-candles.mjs
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -9,7 +9,7 @@ import { createPool, getPool } from '../core/db.js';
 import { getCandles } from '../core/market.js';
 import { upsertCandles, pruneOldCandles } from '../core/candles-store.js';
 
-const LIMIT = 1000; // GeckoTerminal maximum ≈ 41 days of 1h
+const LIMIT = 1000; // Binance klines maximum ≈ 41 days of 1h
 
 // A non-zero exit code only if nothing got updated at all while there were failures (for cron monitoring).
 export function exitCode(ok, fail) {
@@ -17,9 +17,10 @@ export function exitCode(ok, fail) {
 }
 
 // Pure orchestration (no createPool/exit) — testable with dependency injection.
-// Sequential (not parallel) — gentler on the GeckoTerminal burst limit. A failure of one pair does not
-// stop the others. Pruning only if something got updated (otherwise, on a total API failure
-// we don't touch the DB). Returns counters { ok, fail, pruned }.
+// Pairs run in PARALLEL — Binance klines is weight-cheap (~5 weight/request, 6000/min per IP), so all
+// pairs at once stay well within limits. Each pair is isolated: one failure does not affect the others
+// (every task catches its own error). Pruning runs once, after all, only if something got updated
+// (otherwise, on a total API failure we don't touch the DB). Returns counters { ok, fail, pruned }.
 export async function refreshCandles({
   pairs,
   limit = LIMIT,
@@ -27,21 +28,22 @@ export async function refreshCandles({
   deps = { getCandles, upsertCandles, pruneOldCandles },
   log = () => {},
 } = {}) {
-  let ok = 0;
-  let fail = 0;
-  let pruned = 0;
-  for (const [pair, cfg] of Object.entries(pairs)) {
-    try {
-      const bars = await deps.getCandles(cfg, { timeframe: '1h', limit });
-      await deps.upsertCandles(pair, '1h', bars);
-      ok++;
-      log(`✓ ${pair} 1h: ${bars.length} bars`);
-    } catch (e) {
-      fail++;
-      log(`✗ ${pair} 1h: ${e.message}`);
-    }
-  }
-  if (ok > 0) pruned = await deps.pruneOldCandles('1h', keepDays);
+  const results = await Promise.all(
+    Object.entries(pairs).map(async ([pair, cfg]) => {
+      try {
+        const bars = await deps.getCandles(cfg, { timeframe: '1h', limit });
+        await deps.upsertCandles(pair, '1h', bars);
+        log(`✓ ${pair} 1h: ${bars.length} bars`);
+        return true;
+      } catch (e) {
+        log(`✗ ${pair} 1h: ${e.message}`);
+        return false;
+      }
+    }),
+  );
+  const ok = results.filter(Boolean).length;
+  const fail = results.length - ok;
+  const pruned = ok > 0 ? await deps.pruneOldCandles('1h', keepDays) : 0;
   return { ok, fail, pruned };
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BoBe Agent — a single reflection run across ALL pairs (analogous to start-all.sh, but for the reflection-job).
 # Reflection — the "recommendations only" mode (changes nothing active), runs once a day.
-# It does not call GeckoTerminal, so no rate-limit risk; the default concurrency is gentle.
+# It does not call Binance, so no rate-limit risk; the default concurrency is gentle.
 #
 #   ./reflect-all.sh                 pairs from core/config.json
 #   ./reflect-all.sh ETH/USDT        only the specified ones
@@ -19,7 +19,7 @@ set -a
 [ -f .env ] && . ./.env
 set +a
 
-: "${CONCURRENCY:=3}"   # reflection does not touch GeckoTerminal; 3 in parallel — sparing on LLM cost
+: "${CONCURRENCY:=3}"   # reflection does not touch Binance; 3 in parallel — sparing on LLM cost
 
 if [ "$#" -gt 0 ]; then
   PAIRS=("$@")

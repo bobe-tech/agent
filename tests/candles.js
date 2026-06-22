@@ -99,8 +99,8 @@ export function toStoreBars(bars) {
   return bars.map((b) => ({ time: b.ts, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v ?? null }));
 }
 
-// Canonical bars → the GeckoTerminal ohlcv_list format (newest-first: [ts,o,h,l,c,v]).
+// Canonical bars → the Binance klines format (ascending: [openTime_ms, o, h, l, c, v, closeTime_ms]).
 // For getCandles/normalize tests, where a "raw" external API response is the input.
-export function toGeckoList(bars) {
-  return bars.map((b) => [b.ts, b.o, b.h, b.l, b.c, b.v ?? 0]).reverse();
+export function toBinanceList(bars) {
+  return bars.map((b) => [b.ts * 1000, b.o, b.h, b.l, b.c, b.v ?? 0, b.ts * 1000 + 3_599_999]);
 }

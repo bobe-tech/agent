@@ -2,13 +2,19 @@
 import { query } from './db.js';
 
 // Bulk-upsert of candles for one pair/timeframe. bars: [{time,open,high,low,close,volume?}] (ascending).
-// getCandles has no volume — we write null (volume is not shown on the chart). Returns the number of rows.
+// volume comes from the source (Binance klines) and is stored; null when a bar carries none. Returns the number of rows.
 export async function upsertCandles(pair, tf, bars) {
   if (!bars || bars.length === 0) return 0;
+  // Dedupe by ts: a candle source can return two bars with the same open timestamp.
+  // A single INSERT ... ON CONFLICT (pair,tf,ts) may not affect the same row twice (Postgres error),
+  // so collapse duplicates first — the last bar for a given ts wins (Map preserves last write).
+  const byTs = new Map();
+  for (const b of bars) byTs.set(b.time, b);
+  const unique = [...byTs.values()];
   const rows = [];
   const params = [];
   let i = 1;
-  for (const b of bars) {
+  for (const b of unique) {
     rows.push(`($${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++},$${i++})`);
     params.push(pair, tf, b.time, b.open, b.high, b.low, b.close, b.volume ?? null);
   }
@@ -19,7 +25,7 @@ export async function upsertCandles(pair, tf, bars) {
       open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low,
       close = EXCLUDED.close, volume = EXCLUDED.volume, updated_at = now()`;
   const res = await query(sql, params);
-  return res.rowCount ?? bars.length;
+  return res.rowCount ?? unique.length;
 }
 
 // Reading candles from the DB (for the agent's getMarket and any readers): the last `limit` bars of pair/tf,

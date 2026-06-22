@@ -3,7 +3,7 @@ import { withTestTx } from './helpers/db.js';
 import { upsertCandles } from '../../core/candles-store.js';
 import { getMarket } from '../../core/market.js';
 
-// getMarket now reads candles FROM the DB (not from GeckoTerminal). We check that features
+// getMarket now reads candles FROM the DB (not from the candle source). We check that features
 // (close, hv, dv, CRSI) are computed from the seeded 1h bars — i.e. the "DB → computeFeatures" path works end-to-end.
 describe('getMarket from DB', () => {
   it('computes features from 1h candles in the candles table', async () => {
@@ -18,7 +18,7 @@ describe('getMarket from DB', () => {
       await upsertCandles('ETH/USDT', '1h', bars);
 
       const m = await getMarket(
-        { base: 'ETH', quote: 'USDT', token: '0xabc', network: 'bsc', pool: '0xpool' },
+        { base: 'ETH', quote: 'USDT', symbol: 'ETHUSDT', token: '0xabc' },
         { timeframe: 'H1', limit: 720, crsi_periods: { rsi_period: 3, streak_period: 2, rank_period: 100 } },
       );
 
@@ -34,7 +34,7 @@ describe('getMarket from DB', () => {
   it('throws if there are no candles in the DB', async () => {
     await withTestTx(async () => {
       await expect(
-        getMarket({ base: 'NOPE', quote: 'USDT', network: 'bsc', pool: '0xpool' }, { timeframe: 'H1' }),
+        getMarket({ base: 'NOPE', quote: 'USDT', symbol: 'NOPEUSDT' }, { timeframe: 'H1' }),
       ).rejects.toThrow();
     });
   });

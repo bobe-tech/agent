@@ -47,7 +47,7 @@ server.tool(
 
 server.tool(
   'get_market',
-  'Market data for a pair (1h candles from the candles table in the DB — populated by the candles-all.sh cron; GeckoTerminal is NOT hit in real time) on the last CLOSED H1 bar: close, hv=ATR% (hourly volatility), dv=daily_vol_pct (daily volatility), mv=monthly_vol_pct, CRSI (Connors RSI on the H1 scale: crsi — the current value from the close of the unclosed H1 bar, crsi_prev — the value from the previous tick for detecting a line crossover), SMA20/50, SMA20 slope, HH/LL over 20/50, ADX. Plus pair metadata: base, quote, token_address (the contract address of the base asset — use it for the twak quote). Anti-repaint: the forming bar is dropped; daily volatility — only over fully closed days.',
+  'Market data for a pair (1h candles from the candles table in the DB — populated by the candles-all.sh cron; Binance is NOT hit in real time) on the last CLOSED H1 bar: close, hv=ATR% (hourly volatility), dv=daily_vol_pct (daily volatility), mv=monthly_vol_pct, CRSI (Connors RSI on the H1 scale: crsi — the current value from the close of the unclosed H1 bar, crsi_prev — the value from the previous tick for detecting a line crossover), SMA20/50, SMA20 slope, HH/LL over 20/50, ADX. Plus pair metadata: base, quote, token_address (the contract address of the base asset — use it for the twak quote). Anti-repaint: the forming bar is dropped; daily volatility — only over fully closed days.',
   {
     pair: z.string().describe('Trading pair, e.g. "ETH/USDT". Must be configured in config.json.'),
     slope_lag: z.number().int().min(2).max(10).default(3).describe('How many bars back to take SMA20 for estimating the slope (params.slope_lag).'),
