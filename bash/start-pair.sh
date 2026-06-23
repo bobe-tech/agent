@@ -56,8 +56,10 @@ TWAK="mcp__twak__get_swap_quote,mcp__twak__swap"
 TOOLS="$BOBE,$CMC,$TWAK"
 
 run_claude() {
-  claude -p "$(cat prompts/strategy.md)" \
-    --append-system-prompt "Pair being traded: $PAIR. Substitute it as pair in all mcp__bobe__* tools." \
+  claude -p "Execute exactly ONE trading tick for $PAIR right now. Follow the strict §0 sequence from your instructions. Begin immediately with mcp__bobe__get_time and finish with mcp__bobe__log_tick. Do not ask questions, do not summarize the rules — act through the tools. Output only the short final summary (§10)." \
+    --append-system-prompt "$(cat prompts/strategy.md)
+
+Pair being traded: $PAIR. Substitute it as pair in all mcp__bobe__* tools." \
     --model "$AGENT_MODEL" \
     --mcp-config .mcp.json --strict-mcp-config \
     --allowedTools "$TOOLS" \
