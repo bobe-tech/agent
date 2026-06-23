@@ -53,8 +53,10 @@ done
 TOOLS="mcp__bobe__get_time,mcp__bobe__get_trades,mcp__bobe__get_ticks,mcp__bobe__get_params_history,mcp__bobe__propose_params,mcp__bobe__record_params_perf,mcp__bobe__log_reflection"
 
 run_claude() {
-  claude -p "$(cat prompts/reflection.md)" \
-    --append-system-prompt "Pair under analysis: $PAIR. Substitute it as pair in all mcp__bobe__* tools." \
+  claude -p "Run today's reflection analysis for $PAIR right now. Follow the strict §0 procedure from your instructions. Begin immediately with mcp__bobe__get_time (set the 24h analysis window from it) and finish with mcp__bobe__log_reflection. Recommendations only — never change active state (any parameter idea is filed with propose_params auto_apply=false). Do not ask questions, do not summarize the rules — act through the tools. Output only the final summary." \
+    --append-system-prompt "$(cat prompts/reflection.md)
+
+Pair under analysis: $PAIR. Substitute it as pair in all mcp__bobe__* tools." \
     --model "$REFLECTION_MODEL" \
     --mcp-config .mcp.json --strict-mcp-config \
     --allowedTools "$TOOLS" \
