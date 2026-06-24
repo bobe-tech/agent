@@ -44,7 +44,7 @@ Every decision is made by an LLM: a Claude Code agent runs each tick, reads live
 ```
 cron (*/10 * * * *) → bash/start-all.sh → fan-out of bash/start-pair.sh across all pairs (CONCURRENCY, default 10)
 bash/start-pair.sh (PAIR) → claude -p (tick-agent, monolithic):
-  1. mcp__bobe__get_time      — server UTC (finish timing, bar-close check)
+  1. mcp__bobe__get_time      — server UTC (bar-close check)
   2. mcp__bobe__get_market    — indicators for the closed H1 bar: hv (ATR%), dv (daily vol),
                                high_24h, ADX/adx_mult, CRSI + crsi_min_3h; + base/quote/token_address. Anti-repaint.
   3. mcp__cmc__*             — Fear & Greed, BTC dominance, (opt.) derivatives — regime tilt
@@ -78,7 +78,7 @@ lessons/statistics. Its own analysis (what it looked at, conclusions, recommenda
 
 ## MCP tools (the `bobe` server)
 
-- **Tick:** `get_time`, `get_market`, `get_params`, `get_state` (active positions with nested `orders`), `log_tick`, `open_position`, `add_to_position`, `close_position` (with `force`), `fill_order` (confirm the swap fill: `comp_*`/`tx_id`), `cancel_order` (swap did not go through). Lifecycle: open/add/close create an `active` order → swap → `fill_order`/`cancel_order`.
+- **Tick:** `get_time`, `get_market`, `get_params`, `get_state` (active positions with nested `orders`), `log_tick`, `open_position`, `add_to_position`, `close_position` (rejected at net PnL ≤ 0 — always, no bypass), `fill_order` (confirm the swap fill: `comp_*`/`tx_id`), `cancel_order` (swap did not go through). Lifecycle: open/add/close create an `active` order → swap → `fill_order`/`cancel_order`.
 - **Reflection (the server has all of them, but the job in "recommendations only" mode uses a subset):** reading — `get_time`, `get_trades`, `get_ticks`, `get_params_history`; writing — `propose_params` (inactive candidates, `auto_apply=false`), `record_params_perf` and `log_reflection` (an analysis summary into the `reflection_log` table → Telegram). The tools that change the active policy (`activate_params`, `rollback_params`, `upsert_lesson`, `deactivate_lesson`, `upsert_regime_stats`) are NOT included in the reflection allow-list.
 
 Privilege separation is via `--allowedTools`: the tick-agent sees only the tick tools, reflection — only reading + recommendations.
@@ -251,19 +251,16 @@ server {
 
 **Before going live:**
 - Trades execute as real on-chain swaps — double-check `WALLET_ADDRESS` / the twak wallet, that it is funded, and that you really intend to trade real funds.
-- Set the hackathon end time (UTC) — without it the finish (closing positions) will not trigger:
-```sql
-UPDATE params SET config = jsonb_set(config,'{hackathon_end}','"2026-06-22T23:59:00Z"'::jsonb,true) WHERE is_active;
-```
+- The agent never closes at a loss — there is no forced/auto close. When you retire the agent, close any positions that did not reach take-profit **manually**.
 
 ## Operation
 
 ```bash
 # decisions / positions / active params
 psql -d bobe_agent -c "SELECT id,pair,action,regime,close,adx,left(reason,60) FROM tick_log ORDER BY id DESC LIMIT 5;"
-psql -d bobe_agent -c "SELECT id,pair,side,status,opened_amount,opened_price,realized_pnl_pct,force_closed FROM positions ORDER BY id DESC LIMIT 5;"
+psql -d bobe_agent -c "SELECT id,pair,side,status,opened_amount,opened_price,realized_pnl_pct,error FROM positions ORDER BY id DESC LIMIT 5;"
 psql -d bobe_agent -c "SELECT id,position_id,action,status,comp_size,comp_amount,comp_price,tx_id FROM orders ORDER BY id DESC LIMIT 5;"
-psql -d bobe_agent -c "SELECT pair,config->>'hackathon_end' fin,config->>'side_mode' side FROM params WHERE is_active ORDER BY pair;"
+psql -d bobe_agent -c "SELECT pair,config->>'side_mode' side,config->>'max_adds' max_adds FROM params WHERE is_active ORDER BY pair;"
 ```
 
 - Logs: `logs/start-pair-<PAIR>-*.log`, `logs/reflect-pair-<PAIR>-*.log`.
@@ -280,7 +277,7 @@ CMC MCP (market regime) · Trust Wallet `twak` MCP (live quotes + on-chain swaps
 - **Tool whitelisting (`--allowedTools`):** each Claude Code run only sees the MCP tools it needs. The tick-agent gets the quote + `swap` and the position lifecycle tools; the reflection-job gets read + recommendation tools only. Tools are gated at launch (`bash/start-pair.sh` / `bash/reflect-pair.sh`), not inside the server.
 - **Privilege separation:** the tick trades but does not change the configuration; reflection does not trade and changes NOTHING active — it only recommends (inactive proposals for a human).
 - **Invariants:** sizes strictly `sizes_usd`, ≤ `max_adds` averagings, ≤1 position/side/pair (unique-index),
-  closing only in profit (except `force=true`); the `config` ranges reflection keeps itself (there is no CHECK on JSONB in the DB).
+  closing only in profit (net>0 guard, always — no bypass); the `config` ranges reflection keeps itself (there is no CHECK on JSONB in the DB).
 - **Pair isolation:** `add/close_position` verify `pair`; adding/closing — transactions with `SELECT FOR UPDATE`.
 
 ## ⚠️ Disclaimer

@@ -197,7 +197,7 @@ export async function fillOrder(a, deps = {}) {
                     / (opened_amount * (closed_size / opened_size)) * 100
              ELSE NULL END
          WHERE id=$1 RETURNING *`,
-        [order.position_id, a.reason ?? order.reason ?? null, a.force ?? false]);
+        [order.position_id, a.reason ?? order.reason ?? null, false]);
       position = pc[0];
     }
     return { order, position };
@@ -252,12 +252,12 @@ export async function closePosition(a) {
     if (!p) throw new Error('active position not found');
     if (a.pair && p.pair !== a.pair) throw new Error(`position #${a.position_id} belongs to pair ${p.pair}, not ${a.pair}`);
     // Guard net>0 (LONG): price*opened_size - opened_amount > 0. Computed in SQL (exactly).
-    if (!a.force) {
-      const { rows: g } = await client.query(
-        `SELECT ($1::numeric * opened_size - opened_amount) > 0 AS profitable FROM positions WHERE id=$2`, [a.price, a.position_id]);
-      if (!g[0].profitable) {
-        throw new Error(`closing at a loss is forbidden: net ≤ 0. To force a finish, pass force=true.`);
-      }
+    // ALWAYS enforced — there is NO bypass. A voluntary losing close is physically impossible;
+    // any position still open at shutdown is closed by a human, not by the agent.
+    const { rows: g } = await client.query(
+      `SELECT ($1::numeric * opened_size - opened_amount) > 0 AS profitable FROM positions WHERE id=$2`, [a.price, a.position_id]);
+    if (!g[0].profitable) {
+      throw new Error(`closing at a loss is forbidden: net ≤ 0.`);
     }
     try {
       const { rows } = await client.query(

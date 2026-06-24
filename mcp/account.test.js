@@ -159,7 +159,7 @@ test('fillOrder close branch: partial close (closed_size ≠ opened_size) → Pn
   });
 });
 
-test('closePosition rejects closing at a loss without force; allows closing in profit', async () => {
+test('closePosition always rejects closing at a loss; allows closing in profit', async () => {
   await withTransaction(async () => {
     const v = await seedParams('ETH/USDT');
     const o = await openPosition({ pair: 'ETH/USDT', side: 'LONG', amount: 20, price: 2000,
@@ -167,10 +167,10 @@ test('closePosition rejects closing at a loss without force; allows closing in p
     await fillOrder(
       { order_id: o.id, tx_id: 'tx-test-6' },
       { resolveFill: fakeFill('0.01', '20') }); // opened_price=2000
-    // price below the average → net<0 → reject
-    await assert.rejects(() => closePosition({ pair: 'ETH/USDT', position_id: o.position_id, price: 1900, reason: 'tp', force: false }), /loss|net/i);
+    // price below the average → net<0 → reject (no bypass exists)
+    await assert.rejects(() => closePosition({ pair: 'ETH/USDT', position_id: o.position_id, price: 1900, reason: 'tp' }), /loss|net/i);
     // price above the average → ok, a close order is created
-    const close = await closePosition({ pair: 'ETH/USDT', position_id: o.position_id, price: 2100, reason: 'tp', force: false });
+    const close = await closePosition({ pair: 'ETH/USDT', position_id: o.position_id, price: 2100, reason: 'tp' });
     assert.equal(close.action, 'close');
     assert.equal(String(close.start_size), '0.010000000000000000'); // the entire base
   });

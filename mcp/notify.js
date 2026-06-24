@@ -65,7 +65,7 @@ export function buildMessage({ tick, positions = [], closed = [], pair }) {
     lines.push(`${pnl >= 0 ? '📈' : '📉'} Result: ${pnl >= 0 ? '+' : ''}${n(pnl)}% (${n(c.realized_pnl_usd)} USDT)`);
     if (c.reason) lines.push(`   exit reason: ${c.reason}`);
     // Special flags (deterministically from positions columns — independent of the agent's reason text).
-    if (c.force_closed) lines.push('   ⚠️ forced close (hackathon finish / liquidation)');
+    if (c.force_closed) lines.push('   ⚠️ forced close (legacy)');  // only historical positions; the agent no longer force-closes
   }
 
   // Open positions

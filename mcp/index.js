@@ -35,7 +35,7 @@ const server = new McpServer({ name: 'bobe', version: '0.1.0' });
 
 server.tool(
   'get_time',
-  'Current server time in UTC: ISO string, Unix seconds and day (for timing the hackathon finish and checking that the H1 bar is closed).',
+  'Current server time in UTC: ISO string, Unix seconds and day (for checking that the H1 bar is closed).',
   {},
   async () => {
     try {
@@ -69,7 +69,7 @@ server.tool(
 
 server.tool(
   'get_params',
-  'The active strategy params version for a pair. The entire configuration is in the JSON config field (side_mode, sizes_usd, max_adds, adx_mult_threshold/lo/hi, avg2_atr_mult, crsi_buy, crsi_window_hours, high_window_hours, CRSI periods, hackathon_end).',
+  'The active strategy params version for a pair. The entire configuration is in the JSON config field (side_mode, sizes_usd, max_adds, adx_mult_threshold/lo/hi, avg2_atr_mult, crsi_buy, crsi_window_hours, high_window_hours, CRSI periods).',
   { pair: z.string().describe('Trading pair, e.g. "ETH/USDT".') },
   async ({ pair }) => {
     try {
@@ -154,25 +154,23 @@ server.tool(
 
 server.tool(
   'close_position',
-  'Close a position (LONG): creates an active close order for the entire held base. Guard: at net PnL ≤ 0 and force=false the close is rejected. Returns the order resource. Then swap (selling the entire base) + fill_order.',
+  'Close a position (LONG): creates an active close order for the entire held base. Guard: at net PnL ≤ 0 the close is rejected — ALWAYS, with no bypass. A losing close is impossible. Returns the order resource. Then swap (selling the entire base) + fill_order.',
   {
     pair: z.string().describe('Trading pair of the position.'),
     position_id: z.number().int().describe('ID of the active position.'),
     price: z.number().positive().describe('Exit price (bid from the twak quote).'),
     reason: z.string().nullable().optional().describe('Close reason (free text).'),
-    force: z.boolean().default(false).describe('true: forced (hackathon finish) — the net>0 guard is lifted.'),
   },
   async (a) => { try { pairCfg(a.pair); return ok(await closePosition(a)); } catch (e) { return fail(e); } }
 );
 
 server.tool(
   'fill_order',
-  'Confirm swap execution: order active → completed. The server reads the actual amounts from the transaction receipt by tx_id ITSELF (comp_size/comp_amount from Transfer events). Recomputes aggregates; for a close order it computes realized_pnl and closes the position. Pass ONLY order_id and tx_id (for close you may also pass reason/force).',
+  'Confirm swap execution: order active → completed. The server reads the actual amounts from the transaction receipt by tx_id ITSELF (comp_size/comp_amount from Transfer events). Recomputes aggregates; for a close order it computes realized_pnl and closes the position. Pass ONLY order_id and tx_id (for close you may also pass reason).',
   {
     order_id: z.union([z.number(), z.string()]).describe('Order ID (from open/add/close).'),
     tx_id: z.string().min(1).describe('Swap transaction hash (required). The server reads the actual amounts by it.'),
     reason: z.string().nullable().optional().describe('Reason (for a close order).'),
-    force: z.boolean().optional().describe('Force close (hackathon finish).'),
   },
   async (a) => { try { return ok(await fillOrder(a)); } catch (e) { return fail(e); } }
 );
