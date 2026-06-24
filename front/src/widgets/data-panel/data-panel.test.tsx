@@ -15,7 +15,7 @@ beforeEach(() => {
   server.use(
     http.get('/api/positions', () => HttpResponse.json({ positions: [] })),
     http.get('/api/ticks', () => HttpResponse.json({ ticks: [] })),
-    http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', last: 2600, time: 1 })),
+    http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', bid: 2599, ask: 2601, mid: 2600, ts: 1 })),
   );
 });
 

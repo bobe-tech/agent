@@ -16,13 +16,14 @@ START="$PROJECT_DIR/bash/start-all.sh"
 AGENT="$PROJECT_DIR/bash/start-pair.sh"
 REFLECT="$PROJECT_DIR/bash/reflect-pair.sh"
 CANDLES="$PROJECT_DIR/bash/candles-all.sh"
+QUOTES="$PROJECT_DIR/bash/quotes-all.sh"
 
-# Preserve someone else's crontab, minus our lines (start/agent/reflect/candles).
-existing="$(crontab -l 2>/dev/null | grep -vF "$START" | grep -vF "$AGENT" | grep -vF "$REFLECT" | grep -vF "$CANDLES" || true)"
+# Preserve someone else's crontab, minus our lines (start/agent/reflect/candles/quotes).
+existing="$(crontab -l 2>/dev/null | grep -vF "$START" | grep -vF "$AGENT" | grep -vF "$REFLECT" | grep -vF "$CANDLES" | grep -vF "$QUOTES" || true)"
 
 if [ "${1:-}" = "--remove" ]; then
   printf '%s\n' "$existing" | crontab -
-  echo "✓ removed the project's cron lines ($START, $AGENT, $REFLECT, $CANDLES)"
+  echo "✓ removed the project's cron lines ($START, $AGENT, $REFLECT, $CANDLES, $QUOTES)"
   exit 0
 fi
 
@@ -50,6 +51,7 @@ CRON_PATH="$(printf '%s\n' "${bins[@]}" /usr/bin /bin | awk '!seen[$0]++' | past
   [ -n "$existing" ] && printf '%s\n' "$existing"
   echo "*/10 * * * * PATH=$CRON_PATH $START"             # tick every 10 min — fan-out across all pairs
   echo "* * * * * PATH=$CRON_PATH $CANDLES >> $PROJECT_DIR/logs/candles-all.log 2>&1" # candles into the DB for the dashboard (once a minute)
+  echo "* * * * * PATH=$CRON_PATH $QUOTES >> $PROJECT_DIR/logs/quotes-all.log 2>&1" # twak quotes into the DB for the dashboard (once a minute)
   for pair in "${PAIRS[@]}"; do
     echo "30 0 * * * PATH=$CRON_PATH PAIR=$pair $REFLECT" # reflection once a day at 00:30
   done

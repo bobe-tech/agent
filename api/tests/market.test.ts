@@ -19,6 +19,13 @@ async function seedCandle(
   );
 }
 
+async function seedQuote(pair: string, ts: number, bid: number, ask: number): Promise<void> {
+  await query(
+    `INSERT INTO quotes (pair, ts, bid, ask, mid, notional) VALUES ($1,$2,$3,$4,$5,100)`,
+    [pair, ts, bid, ask, (bid + ask) / 2],
+  );
+}
+
 describe('market routes (reading candles from DB)', () => {
   let app: FastifyInstance;
   beforeAll(async () => {
@@ -43,13 +50,16 @@ describe('market routes (reading candles from DB)', () => {
     });
   });
 
-  it('GET /price returns the close of the latest 1h bar', async () => {
+  it('GET /price returns the latest bid/ask quote', async () => {
     await withTestTx(async () => {
-      await seedCandle('ETH/USDT', 1000, 10, 11, 9, 10.5);
-      await seedCandle('ETH/USDT', 4600, 10.5, 12, 10, 11.7);
+      await seedQuote('ETH/USDT', 1000, 11.5, 11.7);
+      await seedQuote('ETH/USDT', 4600, 12.0, 12.2);
       const res = await app.inject({ method: 'GET', url: '/api/market/ETH%2FUSDT/price' });
       expect(res.statusCode).toBe(200);
-      expect(res.json().last).toBe(11.7);
+      const body = res.json() as { bid: number; ask: number; mid: number };
+      expect(body.bid).toBe(12.0);
+      expect(body.ask).toBe(12.2);
+      expect(body.mid).toBeCloseTo(12.1, 6);
     });
   });
 
@@ -84,7 +94,7 @@ describe('market routes (reading candles from DB)', () => {
     });
   });
 
-  it('GET /price with no candles → 503', async () => {
+  it('GET /price with no quote → 503', async () => {
     await withTestTx(async () => {
       const res = await app.inject({ method: 'GET', url: '/api/market/CAKE%2FUSDT/price' });
       expect(res.statusCode).toBe(503);

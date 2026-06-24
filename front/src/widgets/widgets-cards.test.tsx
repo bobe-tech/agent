@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { type ReactNode } from 'react';
@@ -11,10 +11,13 @@ function wrap(ui: ReactNode) {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-it('PriceTicker shows the pair price', async () => {
-  server.use(http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', last: 2500, time: 1 })));
+it('PriceTicker shows the pair bid and ask', async () => {
+  server.use(http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', bid: 2499, ask: 2501, mid: 2500, ts: 1 })));
   render(wrap(<PriceTicker pair="ETH/USDT" />));
-  await waitFor(() => expect(screen.getByText('2,500.00')).toBeInTheDocument());
+  expect(await screen.findByText(/2,499/)).toBeInTheDocument();
+  expect(await screen.findByText(/2,501/)).toBeInTheDocument();
+  expect(screen.getByText('Bid')).toBeInTheDocument();
+  expect(screen.getByText('Ask')).toBeInTheDocument();
 });
 
 it('StatCard renders value and badge', () => {

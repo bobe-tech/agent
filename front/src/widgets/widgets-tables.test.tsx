@@ -24,7 +24,7 @@ const ethPosition = {
 };
 
 const priceHandler = http.get('/api/market/:p/price', () =>
-  HttpResponse.json({ pair: 'ETH/USDT', last: 2600, time: 1 }),
+  HttpResponse.json({ pair: 'ETH/USDT', bid: 110, ask: 112, mid: 111, ts: 1 }),
 );
 
 it('PositionsTable renders a position with a side badge', async () => {
@@ -37,6 +37,28 @@ it('PositionsTable filters by status (completed will not show active)', async ()
   server.use(http.get('/api/positions', () => HttpResponse.json({ positions: [ethPosition] })), priceHandler);
   render(wrap(<PositionsTable pair="ETH/USDT" status="completed" />));
   await waitFor(() => expect(screen.getByText('No records found')).toBeInTheDocument());
+});
+
+it('PositionsTable marks LONG at bid and SHORT at ask', async () => {
+  const longPos = {
+    ...ethPosition,
+    id: 'long-1', side: 'LONG' as const, status: 'active',
+    opened_price: '100', opened_amount: '100',
+  };
+  const shortPos = {
+    ...ethPosition,
+    id: 'short-1', side: 'SHORT' as const, status: 'active',
+    opened_price: '100', opened_amount: '100',
+  };
+  server.use(
+    http.get('/api/positions', () => HttpResponse.json({ positions: [longPos, shortPos] })),
+    http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', bid: 110, ask: 90, mid: 100, ts: 1 })),
+  );
+  render(wrap(<PositionsTable pair="ETH/USDT" status="active" />));
+  // LONG marked at bid: 110/100 − 1 = +10%. SHORT marked at ask: 1 − 90/100 = +10%.
+  // A swapped bid/ask would flip one row to −10%, failing the length-2 assertions below.
+  await waitFor(() => expect(screen.getAllByText('+$10.00')).toHaveLength(2));
+  expect(screen.getAllByText('(+10.00%)')).toHaveLength(2);
 });
 
 it('ReflectionsList shows summary from reflection_log', async () => {

@@ -55,17 +55,3 @@ export async function listCandles(pair: string, tf: string, limit: number): Prom
   const base = await readHourly(pair, limit * factor);
   return resample(base, periodSec).slice(-limit);
 }
-
-// last price of a pair = close of the latest 1h bar (+ time) and prevClose of the previous bar (for coloring
-// the direction). null if there are no candles yet.
-export async function getLastClose(
-  pair: string,
-): Promise<{ last: number; time: number; prevClose: number | null } | null> {
-  const { rows } = await query<{ close: number; ts: number }>(
-    `SELECT close::float8 AS close, ts FROM candles WHERE pair = $1 AND tf = '1h' ORDER BY ts DESC LIMIT 2`,
-    [pair],
-  );
-  const r = rows[0];
-  if (!r) return null;
-  return { last: r.close, time: Number(r.ts), prevClose: rows[1]?.close ?? null };
-}

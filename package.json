@@ -20,6 +20,7 @@
     "api:start": "node --env-file=.env --import tsx api/src/index.ts",
     "start:mcp": "node mcp/index.js",
     "candles:refresh": "node --env-file-if-exists=.env bin/refresh-candles.mjs",
+    "quotes:refresh": "node --env-file-if-exists=.env bin/refresh-quotes.mjs",
     "front:dev": "vite front",
     "front:build": "vite build front",
     "front:preview": "vite preview front",

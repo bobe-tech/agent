@@ -3,24 +3,18 @@ import { getClosedForPnl, getOpenForPnl, getFirstTradeMsByPair } from '../reposi
 import { getDepositBases } from '../repositories/params.js';
 import { summarizePnl } from '../services/pnl.js';
 import { listPairs, isKnownPair } from '../pairs-config.js';
-import { getLastClose } from '../repositories/candles.js';
+import { getLatestQuotes } from '../repositories/quotes.js';
 import { pnlQuerySchema } from '../schemas.js';
 import { validateResponse, responseSchemas } from '../responses.js';
 import type { ClosedPnlRow, OpenPnlRow, PnlSummary } from '../types.js';
 
-// last prices of a set of pairs from the DB (for unrealized). Cheap and without an external source; error/no data → null.
-async function lastPrices(pairs: string[]): Promise<Record<string, number | null>> {
-  const entries = await Promise.all(
-    pairs.map(async (pair): Promise<readonly [string, number | null]> => {
-      try {
-        const p = await getLastClose(pair);
-        return [pair, p?.last ?? null];
-      } catch {
-        return [pair, null];
-      }
-    }),
-  );
-  return Object.fromEntries(entries);
+// Latest bid/ask per pair from the DB (for unrealized). Cheap, no external source; missing pairs absent.
+async function quotesFor(pairs: string[]): Promise<Record<string, { bid: number; ask: number }>> {
+  try {
+    return await getLatestQuotes(pairs);
+  } catch {
+    return {};
+  }
 }
 
 // Earliest trade date across all pairs (for the portfolio APR). null if there are no trades.
@@ -53,8 +47,8 @@ export async function registerPnlRoutes(app: FastifyInstance): Promise<void> {
       getDepositBases(),
       getFirstTradeMsByPair(),
     ]);
-    const prices = await lastPrices([...new Set(open.map((o) => o.pair))]);
-    const summary = summarizePnl(closed, open, prices, {
+    const quotes = await quotesFor([...new Set(open.map((o) => o.pair))]);
+    const summary = summarizePnl(closed, open, quotes, {
       base: pair ? (bases.byPair[pair] ?? 0) : bases.total,
       firstTradeMs: pair ? (firstByPair[pair] ?? null) : minMs(firstByPair),
     });
@@ -69,14 +63,14 @@ export async function registerPnlRoutes(app: FastifyInstance): Promise<void> {
       getDepositBases(),
       getFirstTradeMsByPair(),
     ]);
-    const prices = await lastPrices([...new Set(open.map((o) => o.pair))]);
-    const total = summarizePnl(closed, open, prices, { base: bases.total, firstTradeMs: minMs(firstByPair) });
+    const quotes = await quotesFor([...new Set(open.map((o) => o.pair))]);
+    const total = summarizePnl(closed, open, quotes, { base: bases.total, firstTradeMs: minMs(firstByPair) });
 
     const closedByPair = groupByPair<ClosedPnlRow>(closed);
     const openByPair = groupByPair<OpenPnlRow>(open);
     const by_pair: Array<PnlSummary & { pair: string }> = listPairs().map((pair) => ({
       pair,
-      ...summarizePnl(closedByPair.get(pair) ?? [], openByPair.get(pair) ?? [], prices, {
+      ...summarizePnl(closedByPair.get(pair) ?? [], openByPair.get(pair) ?? [], quotes, {
         base: bases.byPair[pair] ?? 0,
         firstTradeMs: firstByPair[pair] ?? null,
       }),

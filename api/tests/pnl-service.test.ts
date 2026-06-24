@@ -18,18 +18,32 @@ describe('summarizePnl (pure aggregation)', () => {
     expect(s.unrealized_usd).toBe(0);
   });
 
-  it('computes unrealized over open positions accounting for side and last price', () => {
+  it('computes unrealized over open positions accounting for side and quote', () => {
     const s = summarizePnl(
       [],
       [
         { pair: 'ETH/USDT', side: 'LONG', opened_amount: '100', opened_price: '100' },
         { pair: 'WBNB/USDT', side: 'SHORT', opened_amount: '100', opened_price: '100' },
       ],
-      { 'ETH/USDT': 110, 'WBNB/USDT': 90 }, // LONG +10%, SHORT +10% (price dropped)
+      // LONG marked at bid (110 -> +10%); SHORT marked at ask (90 -> +10%, price dropped)
+      { 'ETH/USDT': { bid: 110, ask: 111 }, 'WBNB/USDT': { bid: 89, ask: 90 } },
     );
-    expect(s.unrealized_usd).toBeCloseTo(20, 6); // +10 (LONG) +10 (SHORT)
+    expect(s.unrealized_usd).toBeCloseTo(20, 6);
     expect(s.open_count).toBe(2);
     expect(s.total_usd).toBeCloseTo(20, 6);
+  });
+
+  it('LONG uses bid, SHORT uses ask (spread-aware)', () => {
+    const s = summarizePnl(
+      [],
+      [
+        { pair: 'A/USDT', side: 'LONG', opened_amount: '100', opened_price: '100' },
+        { pair: 'B/USDT', side: 'SHORT', opened_amount: '100', opened_price: '100' },
+      ],
+      { 'A/USDT': { bid: 100, ask: 102 }, 'B/USDT': { bid: 98, ask: 100 } },
+    );
+    // LONG at bid 100 -> 0%; SHORT at ask 100 -> 0%  => both flat despite a spread
+    expect(s.unrealized_usd).toBeCloseTo(0, 6);
   });
 
   it('win_rate = null when there are no closed trades', () => {
@@ -47,7 +61,7 @@ describe('summarizePnl (pure aggregation)', () => {
     const s = summarizePnl(
       [],
       [{ pair: 'ETH/USDT', side: 'LONG', opened_amount: '20', opened_price: null }],
-      { 'ETH/USDT': 2500 },
+      { 'ETH/USDT': { bid: 2500, ask: 2500 } },
       { base: 20 },
     );
     expect(s.unrealized_usd).toBe(0);
@@ -59,7 +73,7 @@ describe('summarizePnl (pure aggregation)', () => {
     const s = summarizePnl(
       [],
       [{ pair: 'ETH/USDT', side: 'LONG', opened_amount: '20', opened_price: '0' }],
-      { 'ETH/USDT': 2500 },
+      { 'ETH/USDT': { bid: 2500, ask: 2500 } },
       { base: 20 },
     );
     expect(s.unrealized_usd).toBe(0);

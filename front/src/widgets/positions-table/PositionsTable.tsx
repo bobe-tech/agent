@@ -9,15 +9,16 @@ import { formatUsd, formatPct, formatPrice } from '@/shared/lib/format';
 
 export type PositionStatusFilter = 'all' | 'active' | 'completed' | 'cancelled';
 
-// Unrealized PnL of an open position based on the current price: LONG grows with the price, SHORT grows when it falls.
+// Unrealized PnL of an open position marked to the exit price: LONG at bid (sell), SHORT at ask (buy-back).
 function unrealized(
   side: 'LONG' | 'SHORT',
   openedPrice: number,
   openedAmount: number,
-  last: number | undefined,
+  quote: { bid: number; ask: number } | undefined,
 ) {
-  if (last == null || !openedPrice) return null;
-  const pct = side === 'LONG' ? last / openedPrice - 1 : 1 - last / openedPrice;
+  if (!quote || !openedPrice) return null;
+  const mark = side === 'LONG' ? quote.bid : quote.ask;
+  const pct = side === 'LONG' ? mark / openedPrice - 1 : 1 - mark / openedPrice;
   return { usd: pct * openedAmount, pct: pct * 100 };
 }
 
@@ -47,7 +48,7 @@ export function PositionsTable({ pair, status = 'all' }: { pair: string | null; 
               const openedAmountNum = p.opened_amount != null ? Number(p.opened_amount) : null;
               const u =
                 p.status === 'active' && openedPriceNum != null && openedAmountNum != null
-                  ? unrealized(p.side, openedPriceNum, openedAmountNum, price?.last)
+                  ? unrealized(p.side, openedPriceNum, openedAmountNum, price)
                   : null;
               return (
                 <Table.Row key={p.id} id={p.id}>

@@ -8,7 +8,8 @@ export interface Candle {
 
 export interface PriceInfo {
   pair: string;
-  last: number;
-  time: number;
-  prev_close: number | null;
+  bid: number;
+  ask: number;
+  mid: number;
+  ts: number;
 }

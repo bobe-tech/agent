@@ -97,6 +97,6 @@ export const responseSchemas = {
   pnl: pnlSummary,
   portfolio: z.object({ total: pnlSummary, by_pair: z.array(pnlSummary.and(z.object({ pair: z.string() }))) }).passthrough(),
   candles: z.object({ pair: z.string(), tf: z.string(), candles: z.array(candle) }).passthrough(),
-  price: z.object({ pair: z.string(), last: z.number(), time: z.number(), prev_close: z.number().nullable() }).passthrough(),
+  price: z.object({ pair: z.string(), bid: z.number(), ask: z.number(), mid: z.number(), ts: z.number() }).passthrough(),
   doc: z.object({ name: z.string(), content: z.string() }).passthrough(),
 } as const;

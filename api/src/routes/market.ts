@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getPairCfg } from '../pairs-config.js';
-import { listCandles, getLastClose } from '../repositories/candles.js';
+import { listCandles } from '../repositories/candles.js';
+import { getLatestQuote } from '../repositories/quotes.js';
 import { candlesQuerySchema } from '../schemas.js';
 import { validateResponse, responseSchemas } from '../responses.js';
 
@@ -22,8 +23,8 @@ export async function registerMarketRoutes(app: FastifyInstance): Promise<void> 
     const pair = decodeURIComponent((req.params as { pair: string }).pair);
     if (!getPairCfg(pair)) return reply.code(404).send({ error: `unknown pair: ${pair}` });
 
-    const p = await getLastClose(pair);
-    if (!p) return reply.code(503).send({ error: 'no price data' });
-    return validateResponse(responseSchemas.price, { pair, last: p.last, time: p.time, prev_close: p.prevClose }, req.log);
+    const q = await getLatestQuote(pair);
+    if (!q) return reply.code(503).send({ error: 'no quote data' });
+    return validateResponse(responseSchemas.price, { pair, bid: q.bid, ask: q.ask, mid: q.mid, ts: q.ts }, req.log);
   });
 }

@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 // Base /api/pairs and /api/pnl/portfolio live in msw.ts (default server).
 export function dashboardHandlers() {
   return [
-    http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', last: 2500, time: 1 })),
+    http.get('/api/market/:p/price', () => HttpResponse.json({ pair: 'ETH/USDT', bid: 2499, ask: 2501, mid: 2500, ts: 1 })),
     http.get('/api/market/:p/candles', () => HttpResponse.json({ candles: [] })),
     http.get('/api/positions', () => HttpResponse.json({ positions: [] })),
     http.get('/api/ticks', () => HttpResponse.json({ ticks: [] })),

@@ -96,9 +96,9 @@ Privilege separation is via `--allowedTools`: the tick-agent sees only the tick 
    - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — trade/closure/error notifications.
    - The twak wallet itself is configured in the `twak` MCP (see `.mcp.json`). Trades are real on-chain swaps, so fund the wallet only when you are ready to trade.
 3. `npm ci` — project dependencies (a single `node_modules` at the root).
-4. `./db/migrate.sh bobe_agent` — apply the migrations (9 tables; idempotent, `--status` — what is applied).
+4. `./db/migrate.sh bobe_agent` — apply the migrations (10 tables; idempotent, `--status` — what is applied).
 5. `bash/install.sh` — seed the parameters for all configured pairs (long-only) and warm up the candles.
-6. `bash/install-cron.sh` — install cron (tick */10 + reflection 00:30 + candles once a minute; `--remove` to remove).
+6. `bash/install-cron.sh` — install cron (tick */10 + reflection 00:30 + candles + quotes once a minute; `--remove` to remove).
 
 The pools and addresses of all pairs — in `core/config.json`.
 
@@ -113,7 +113,8 @@ bash/start-all.sh                        # fan-out of ticks across all pairs (CO
 PAIR=ETH/USDT bash/reflect-pair.sh --dev # reflection of one pair with output
 bash/reflect-all.sh                      # fan-out of reflection across all pairs (once a day)
 bash/candles-all.sh                      # refresh the 1h candles for all pairs in the DB (for the dashboard)
-bash/install-cron.sh                     # tick */10 + reflection 00:30 + candles once a minute; --remove to remove
+bash/quotes-all.sh                       # refresh the live twak bid/ask quotes for all pairs in the DB (for the dashboard)
+bash/install-cron.sh                     # tick */10 + reflection 00:30 + candles + quotes once a minute; --remove to remove
 ```
 
 The scripts are **self-sufficient regarding `PATH`** (they add `~/.local/bin` etc. themselves) — in cron
@@ -122,7 +123,7 @@ a `PATH=...` prefix is not needed, the full path is enough: `1 * * * * /path/to/
 ## Web dashboard (UI)
 
 The **BNB Hack** dashboard — read-only observation of the agent (no authentication, dark theme): pair selection +
-the latest price, a candlestick chart (TradingView lightweight-charts) with the average entry price line of open
+the latest live twak bid/ask quote, a candlestick chart (TradingView lightweight-charts) with the average entry price line of open
 positions, tables of positions and ticks (filter by the agent's decision type), strategy parameters, self-learning
 conclusions (`reflection_log`) and PnL by pair/portfolio.
 
@@ -137,6 +138,16 @@ Therefore the candles cron must be running (on the first run, fill the DB manual
 empty data and do a HOLD). One-off fill:
 ```bash
 bash/candles-all.sh                  # or npm run candles:refresh — fill the DB with candles
+```
+
+Quotes (header price + unrealized PnL): the dashboard shows the **live twak bid/ask** of the selected pair (small
+two-line BID/ASK), and unrealized PnL is marked to the exit price by side (LONG at `bid`, SHORT at `ask`). These come
+**from the DB** (the `quotes` table), filled by the cron script `quotes-all.sh` (one quote-only twak swap per pair, once
+a minute; `install-cron.sh` installs the entry) — this is the **only** dashboard path that calls twak (the request path
+never does). Therefore the quotes cron must be running: with no fresh quote, `/api/market/<pair>/price` returns `503`
+(the header shows `—`) and unrealized PnL is `0`. One-off fill:
+```bash
+bash/quotes-all.sh                   # or npm run quotes:refresh — fill the DB with twak bid/ask quotes
 ```
 
 ### Running (dev, auto-restart on code change)
@@ -200,7 +211,7 @@ bash db/migrate.sh                 # new migrations (idempotent — only the fre
 npm run front:build                # rebuild the dashboard static → front/dist
 ```
 On the first rollout, additionally: `createdb bobe_agent`, `./db/migrate.sh bobe_agent`, `bash/install.sh`,
-`bash/install-cron.sh` (tick + reflection + candles), `npm run candles:refresh` (fill the candles once).
+`bash/install-cron.sh` (tick + reflection + candles + quotes), `npm run candles:refresh` and `npm run quotes:refresh` (fill candles and quotes once).
 
 ### Web dashboard on the server
 - **API** — a long-lived process (systemd / pm2 etc.): `npm run api:start` (= `tsx api/src/index.ts`),
@@ -208,6 +219,7 @@ On the first rollout, additionally: `createdb bobe_agent`, `./db/migrate.sh bobe
   only nginx publishes it externally. If the front and API are on one domain (nginx below) — CORS is not needed;
   otherwise set `CORS_ORIGINS=https://dashboard.example.com`.
 - **Candles** — the cron `bash/candles-all.sh` (installed by `bash/install-cron.sh`) fills the `candles` table once a minute.
+- **Quotes** — the cron `bash/quotes-all.sh` (installed by `bash/install-cron.sh`) fills the `quotes` table with live twak bid/ask once a minute (the header price + unrealized PnL source; without it `/price` → `503` and unrealized = `0`).
 - **Front** — the static `front/dist` (after `npm run front:build`), served by nginx; `/api/*` it proxies
   to the API. The front calls relative `/api/*`, therefore a separate domain/port for the front is not needed.
 
