@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createPool, getPool, query } from '../core/db.js';
-import { getMarket } from '../core/market.js';
+import { getMarket, marketParamsFromConfig } from '../core/market.js';
 import { crsiMinOverWindow, logTick } from '../mcp/account.js';
 import { gateDecision, regimeLabel } from '../core/tick-gate.js';
 
@@ -58,14 +58,7 @@ async function main() {
   const { rows: pr } = await query('SELECT version, config FROM params WHERE pair=$1 AND is_active LIMIT 1', [pair]);
   const params_version = pr[0]?.version ?? null;
   const c = pr[0]?.config || {};
-  const crsi_periods = {
-    rsi_period: Number(c.crsi_rsi_period ?? 3),
-    streak_period: Number(c.crsi_streak_period ?? 2),
-    rank_period: Number(c.crsi_rank_period ?? 100),
-  };
-  const adx_mult = { threshold: Number(c.adx_mult_threshold ?? 30), lo: Number(c.adx_mult_lo ?? 1), hi: Number(c.adx_mult_hi ?? 1.3) };
-  const high_window_hours = Number(c.high_window_hours ?? 24);
-  const crsi_window_hours = Number(c.crsi_window_hours ?? 3);
+  const { crsi_periods, adx_mult, high_window_hours, crsi_window_hours } = marketParamsFromConfig(c);
 
   const market = await getMarket(pairCfg, { crsi_periods, adx_mult, high_window_hours });
   const crsi_min_3h = await crsiMinOverWindow(pair, crsi_window_hours);

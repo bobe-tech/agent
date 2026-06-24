@@ -10,7 +10,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { createPool } from '../core/db.js';
-import { getMarket } from '../core/market.js';
+import { getMarket, marketParamsFromConfig } from '../core/market.js';
 import { getParams, getState, logTick, openPosition, addToPosition, closePosition, fillOrder, cancelOrder, crsiMinOverWindow } from './account.js';
 import {
   getTrades, getTicks, getParamsHistory, upsertRegimeStats, upsertLesson, deactivateLesson,
@@ -58,18 +58,7 @@ server.tool(
       const cfg = pairCfg(pair);
       const { rows: pr } = await pool.query('SELECT config FROM params WHERE pair=$1 AND is_active', [pair]);
       const c = pr[0]?.config || {};
-      const crsi_periods = {
-        rsi_period: Number(c.crsi_rsi_period ?? 3),
-        streak_period: Number(c.crsi_streak_period ?? 2),
-        rank_period: Number(c.crsi_rank_period ?? 100),
-      };
-      const adx_mult = {
-        threshold: Number(c.adx_mult_threshold ?? 30),
-        lo: Number(c.adx_mult_lo ?? 1),
-        hi: Number(c.adx_mult_hi ?? 1.3),
-      };
-      const high_window_hours = Number(c.high_window_hours ?? 24);
-      const crsi_window_hours = Number(c.crsi_window_hours ?? 3);
+      const { crsi_periods, adx_mult, high_window_hours, crsi_window_hours } = marketParamsFromConfig(c);
       const market = await getMarket(cfg, { timeframe, limit, crsi_periods, adx_mult, high_window_hours });
       // CRSI history lives in tick_log (the tick cron runs every 10 min). Minimum over the crossing window.
       const crsi_min_3h = await crsiMinOverWindow(pair, crsi_window_hours);

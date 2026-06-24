@@ -154,6 +154,25 @@ export async function getCandles(pairCfg, { timeframe = '1h', limit = 300 } = {}
   return bars.map((b) => ({ time: b.ts, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v }));
 }
 
+// Map an active params `config` (JSONB) → the getMarket options. Single source of truth for the
+// strategy defaults, shared by the get_market MCP handler and the pre-filter gate so they can never drift.
+export function marketParamsFromConfig(c = {}) {
+  return {
+    crsi_periods: {
+      rsi_period: Number(c.crsi_rsi_period ?? 3),
+      streak_period: Number(c.crsi_streak_period ?? 2),
+      rank_period: Number(c.crsi_rank_period ?? 100),
+    },
+    adx_mult: {
+      threshold: Number(c.adx_mult_threshold ?? 30),
+      lo: Number(c.adx_mult_lo ?? 1),
+      hi: Number(c.adx_mult_hi ?? 1.3),
+    },
+    high_window_hours: Number(c.high_window_hours ?? 24),
+    crsi_window_hours: Number(c.crsi_window_hours ?? 3),
+  };
+}
+
 // pairCfg — an object from config.json (base/quote/token). Reads candles FROM the DB (the candles table, populated by
 // the cron), computes features (anti-repaint). In real time it does NOT hit Binance — only the cron does.
 // We store 1h in the DB; for H4/D1 we resample from 1h. The pair name for the query is base/quote (= the config.json key).

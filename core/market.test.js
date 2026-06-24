@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeFeatures, normalize, getCandles, getMarket } from './market.js';
+import { computeFeatures, normalize, getCandles, getMarket, marketParamsFromConfig } from './market.js';
 import { getPool } from '../core/db.js';
 import { withTx, setupTestDb } from '../tests/db.js';
 import { seedCandles } from '../tests/factories.js';
@@ -205,3 +205,18 @@ test('getMarket(H4): resample 1h→4h from the DB, features are computed', async
 });
 
 process.on('exit', () => { try { getPool().end(); } catch { /* already ended */ } });
+
+test('marketParamsFromConfig: defaults when empty, and reads config keys (shared by get_market + gate)', () => {
+  const def = marketParamsFromConfig({});
+  assert.deepEqual(def.crsi_periods, { rsi_period: 3, streak_period: 2, rank_period: 100 });
+  assert.deepEqual(def.adx_mult, { threshold: 30, lo: 1, hi: 1.3 });
+  assert.equal(def.high_window_hours, 24);
+  assert.equal(def.crsi_window_hours, 3);
+
+  const custom = marketParamsFromConfig({ adx_mult_threshold: 25, adx_mult_hi: 1.5, crsi_window_hours: 5, high_window_hours: 48, crsi_rsi_period: 4 });
+  assert.equal(custom.adx_mult.threshold, 25);
+  assert.equal(custom.adx_mult.hi, 1.5);
+  assert.equal(custom.crsi_window_hours, 5);
+  assert.equal(custom.high_window_hours, 48);
+  assert.equal(custom.crsi_periods.rsi_period, 4);
+});
