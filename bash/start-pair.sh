@@ -55,6 +55,14 @@ CMC="mcp__cmc__get_global_metrics_latest,mcp__cmc__get_global_crypto_derivatives
 TWAK="mcp__twak__get_swap_quote,mcp__twak__swap"
 TOOLS="$BOBE,$CMC,$TWAK"
 
+# Pre-filter: if the ATR gate of the only possible action is provably not met, the gate logs a HOLD
+# tick itself (source='prefilter') and we skip the expensive LLM entirely. Fail-open: prints RUN on any error.
+GATE_DECISION="$(node bin/tick-gate.mjs)"
+if [ "$GATE_DECISION" = "SKIP" ]; then
+  echo "✓ $(date '+%Y-%m-%d %H:%M:%S') — tick $PAIR pre-filtered → HOLD (agent skipped)"
+  exit 0
+fi
+
 run_claude() {
   claude -p "Execute exactly ONE trading tick for $PAIR right now. Follow the strict §0 sequence from your instructions. Begin immediately with mcp__bobe__get_time and finish with mcp__bobe__log_tick. Do not ask questions, do not summarize the rules — act through the tools. Output only the short final summary (§10)." \
     --append-system-prompt "$(cat prompts/strategy.md)

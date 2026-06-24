@@ -300,8 +300,8 @@ export async function logTick(pair, d) {
     `INSERT INTO tick_log
        (pair, regime, action, close, live_close, high_24h, atr_pct, daily_vol_pct, adx, adx_mult,
         crsi, crsi_min_3h, fng, btc_dom, expected_move_pct,
-        confidence, reason, applied_lessons, position_id, params_version, live_bid, live_ask, raw_decision)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        confidence, reason, applied_lessons, position_id, params_version, live_bid, live_ask, raw_decision, source)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      RETURNING id`,
     [pair, d.regime, d.action, f.close ?? null, f.live_close ?? null, f.high_24h ?? null,
      f.atr_pct ?? null, f.daily_vol_pct ?? null, f.adx ?? null, f.adx_mult ?? null,
@@ -309,6 +309,6 @@ export async function logTick(pair, d) {
      d.confidence ?? null, d.reason ?? null,
      d.applied_lessons ? JSON.stringify(d.applied_lessons) : null,
      d.position_id ?? null,
-     d.params_version, d.live_bid ?? null, d.live_ask ?? null, JSON.stringify(d)]);
+     d.params_version, d.live_bid ?? null, d.live_ask ?? null, JSON.stringify(d), d.source ?? 'agent']);
   return { ok: true, tick_id: rows[0].id };
 }
